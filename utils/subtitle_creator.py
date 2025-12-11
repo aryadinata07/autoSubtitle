@@ -5,7 +5,7 @@ from .ui import print_step, print_success
 
 
 def create_srt(segments, output_path):
-    """Create SRT subtitle file from segments"""
+    """Create SRT subtitle file from segments with styling"""
     print_step(3, 3, "Creating subtitle file")
     subs = pysrt.SubRipFile()
     
@@ -27,6 +27,8 @@ def create_srt(segments, output_path):
         end_millis = int((end_sec % 1) * 1000)
         
         text = segment["text"].strip()
+        # Add ASS styling tags for better appearance
+        text = f"{{\\fs18\\b0\\c&HFFFFFF&\\3c&H000000&\\bord2\\shad1}}{text}"
         
         sub = pysrt.SubRipItem(
             index=i,
