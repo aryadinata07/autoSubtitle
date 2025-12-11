@@ -29,15 +29,42 @@ def transcribe_audio_faster(audio_path, model_size="base", language=None):
         print_substep("Forcing CPU mode (CUDA_VISIBLE_DEVICES=-1)")
         model = WhisperModel(model_size, device="cpu", compute_type="int8")
     else:
+        # Check if cuDNN is available before trying GPU
+        import subprocess
+        cudnn_available = False
         try:
-            # Try GPU first
-            model = WhisperModel(model_size, device="cuda", compute_type="float16")
-            print_substep("Using GPU acceleration")
-        except Exception as e:
-            # Fallback to CPU if GPU fails
-            print_substep(f"GPU initialization failed: {str(e)[:50]}...")
-            print_substep("Falling back to CPU mode")
+            # Quick test to see if CUDA/cuDNN works
+            result = subprocess.run(
+                ['nvidia-smi'],
+                capture_output=True,
+                text=True,
+                timeout=3
+            )
+            if result.returncode == 0:
+                # NVIDIA GPU detected, but need to check cuDNN
+                # Try to import torch to test CUDA availability
+                try:
+                    import torch
+                    cudnn_available = torch.cuda.is_available()
+                except:
+                    cudnn_available = False
+        except:
+            pass
+        
+        if not cudnn_available:
+            # No cuDNN, use CPU directly
+            print_substep("GPU detected but cuDNN not available, using CPU mode")
             model = WhisperModel(model_size, device="cpu", compute_type="int8")
+        else:
+            try:
+                # Try GPU with cuDNN
+                model = WhisperModel(model_size, device="cuda", compute_type="float16")
+                print_substep("Using GPU acceleration")
+            except Exception as e:
+                # Fallback to CPU if GPU fails
+                print_substep(f"GPU initialization failed: {str(e)[:50]}...")
+                print_substep("Falling back to CPU mode")
+                model = WhisperModel(model_size, device="cpu", compute_type="int8")
     
     print_success("Model loaded successfully")
     
