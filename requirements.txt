@@ -1,0 +1,11 @@
+openai-whisper
+faster-whisper
+moviepy
+pysrt
+tqdm
+deep-translator
+colorama
+rich
+openai
+python-dotenv
+yt-dlp
