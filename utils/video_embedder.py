@@ -27,13 +27,26 @@ def check_gpu_available():
     """Check if NVIDIA GPU is available for hardware acceleration"""
     import subprocess
     try:
+        # Check if nvidia-smi exists (NVIDIA GPU driver)
         result = subprocess.run(
+            ['nvidia-smi'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if result.returncode != 0:
+            return False
+        
+        # Also check if ffmpeg supports cuda
+        result2 = subprocess.run(
             ['ffmpeg', '-hwaccels'],
             capture_output=True,
             text=True,
             timeout=5
         )
-        return 'cuda' in result.stdout.lower()
+        
+        return 'cuda' in result2.stdout.lower() and result.returncode == 0
     except:
         return False
 
@@ -61,11 +74,17 @@ def embed_subtitle_to_video(video_path, subtitle_path, output_path=None, method=
     if duration:
         print_substep(f"Video duration: {duration:.1f} seconds")
     
-    # Escape subtitle path for ffmpeg
-    subtitle_path_escaped = subtitle_path.replace('\\', '/').replace(':', '\\:')
+    # Escape subtitle path for ffmpeg subtitles filter
+    # Convert to absolute path and escape special characters properly
+    subtitle_path_abs = os.path.abspath(subtitle_path)
+    # For Windows paths in ffmpeg: use forward slashes and escape special chars
+    subtitle_path_escaped = subtitle_path_abs.replace('\\', '/').replace(':', '\\:')
+    # Escape single quotes by replacing with '\'' (end quote, escaped quote, start quote)
+    subtitle_path_escaped = subtitle_path_escaped.replace("'", "'\\''")
     
     # Build ffmpeg command based on method
-    subtitle_filter = f"subtitles='{subtitle_path_escaped}':force_style='FontSize=18,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,BackColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Bold=0,MarginV=20'"
+    # Simplified subtitle filter without force_style to avoid parsing issues
+    subtitle_filter = f"subtitles='{subtitle_path_escaped}'"
     
     if method == 'gpu':
         # Check GPU availability
