@@ -67,13 +67,44 @@ def transcribe_audio_faster(audio_path, model_size="base", language=None):
         detected_lang = info.language if hasattr(info, 'language') else 'unknown'
         
     except Exception as e:
-        print_error("Transcription failed!")
-        print_substep(f"Error: {str(e)}")
-        print_substep("\nPossible solutions:")
-        print_substep("1. Make sure ffmpeg is installed and in PATH")
-        print_substep("2. Restart your terminal/PowerShell")
-        print_substep("3. Try: refreshenv (if using Chocolatey)")
-        raise
+        error_msg = str(e).lower()
+        # Check if it's a cuDNN error
+        if 'cudnn' in error_msg or 'cuda' in error_msg:
+            print_error("GPU/cuDNN error detected!")
+            print_substep("Retrying with CPU mode...")
+            
+            # Reload model with CPU
+            model = WhisperModel(model_size, device="cpu", compute_type="int8")
+            print_substep("Model reloaded in CPU mode")
+            
+            # Retry transcription with CPU
+            segments, info = model.transcribe(
+                audio_path,
+                language=language,
+                beam_size=5,
+                vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=500)
+            )
+            
+            # Convert segments to list
+            result_segments = []
+            for segment in segments:
+                result_segments.append({
+                    'start': segment.start,
+                    'end': segment.end,
+                    'text': segment.text
+                })
+            
+            detected_lang = info.language if hasattr(info, 'language') else 'unknown'
+        else:
+            # Other errors
+            print_error("Transcription failed!")
+            print_substep(f"Error: {str(e)}")
+            print_substep("\nPossible solutions:")
+            print_substep("1. Make sure ffmpeg is installed and in PATH")
+            print_substep("2. Restart your terminal/PowerShell")
+            print_substep("3. Try: refreshenv (if using Chocolatey)")
+            raise
     
     print_success("Transcription complete!")
     print_substep(f"Detected language: {detected_lang}")
