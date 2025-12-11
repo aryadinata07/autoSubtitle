@@ -16,16 +16,48 @@ pip install -r requirements.txt
 
 ## Cara Pakai
 
-### Basic Usage
+### Interactive Mode
 ```bash
 python generate_subtitle.py
 ```
-
 Script akan menanyakan:
 1. **Video source**: Local file atau YouTube URL
 2. **File path/URL**: Tergantung pilihan di step 1
 3. **Transcription method**: Regular Whisper atau Faster-Whisper
 4. **Translation method**: Google Translate atau DeepSeek AI
+5. **Embedding method**: Standard, Fast, atau GPU
+
+### Command Line Mode
+
+**YouTube URL:**
+```bash
+python generate_subtitle.py -url "https://youtube.com/watch?v=..."
+```
+
+**Local File:**
+```bash
+python generate_subtitle.py -l "C:\path\to\video.mp4"
+```
+
+**Dengan Options:**
+```bash
+# YouTube dengan Faster-Whisper dan DeepSeek
+python generate_subtitle.py -url "https://youtube.com/..." --faster --deepseek
+
+# Local file dengan model small
+python generate_subtitle.py -l "video.mp4" --model small
+
+# Local file dengan bahasa spesifik
+python generate_subtitle.py -l "video.mp4" --lang id
+```
+
+**Available Options:**
+- `-url <url>` atau `--url <url>` - YouTube URL
+- `-l <path>` atau `--local <path>` - Local video file path
+- `--model <size>` - Model size: tiny, base, small, medium, large
+- `--lang <code>` - Language: id, en, atau auto-detect
+- `--faster` - Use Faster-Whisper
+- `--deepseek` - Use DeepSeek AI for translation
 
 Output: `video_with_subtitle.mp4` (video dengan subtitle ter-embed)
 

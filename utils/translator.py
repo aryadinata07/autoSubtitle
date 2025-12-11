@@ -4,7 +4,7 @@ from .translator_google import translate_with_google
 from .translator_deepseek import translate_with_deepseek
 
 
-def translate_subtitles(subs, source_lang, target_lang, use_deepseek=False, deepseek_api_key=None):
+def translate_subtitles(subs, source_lang, target_lang, use_deepseek=False, deepseek_api_key=None, video_title=None):
     """
     Translate subtitle entries using selected translator
     
@@ -14,6 +14,7 @@ def translate_subtitles(subs, source_lang, target_lang, use_deepseek=False, deep
         target_lang: Target language code (en, id)
         use_deepseek: Use DeepSeek AI (True) or Google Translate (False)
         deepseek_api_key: DeepSeek API key (required if use_deepseek=True)
+        video_title: Video title (optional, used as additional context for DeepSeek)
     """
     translator_name = "DeepSeek AI" if use_deepseek else "Google Translate"
     print_step(3, 3, f"Translating subtitles ({source_lang.upper()} → {target_lang.upper()})")
@@ -28,7 +29,7 @@ def translate_subtitles(subs, source_lang, target_lang, use_deepseek=False, deep
     
     # Translate using selected method
     if use_deepseek:
-        subs = translate_with_deepseek(subs, source_lang, target_lang, deepseek_api_key)
+        subs = translate_with_deepseek(subs, source_lang, target_lang, deepseek_api_key, video_title=video_title)
     else:
         subs = translate_with_google(subs, source_lang, target_lang)
     

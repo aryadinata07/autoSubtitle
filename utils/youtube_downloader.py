@@ -44,7 +44,7 @@ def download_youtube_video(url, output_path="downloads"):
         output_path: Output directory for downloaded video
     
     Returns:
-        Path to downloaded video file
+        Tuple of (downloaded_file_path, video_title)
     """
     print_step(1, 4, "Downloading YouTube video")
     print_substep(f"URL: {url}")
@@ -83,7 +83,7 @@ def download_youtube_video(url, output_path="downloads"):
             downloaded_file = ydl.prepare_filename(info)
             
             print_success(f"Video downloaded: {downloaded_file}")
-            return downloaded_file
+            return downloaded_file, video_title
             
     except Exception as e:
         print_error(f"Failed to download video: {str(e)}")

@@ -33,6 +33,7 @@ def generate_subtitle(
     use_deepseek=False,
     use_faster_whisper=False,
     embedding_method='standard',
+    video_title=None,
 ):
     """
     Generate subtitle from video file
@@ -48,6 +49,7 @@ def generate_subtitle(
         use_deepseek: Use DeepSeek AI for translation (more accurate)
         use_faster_whisper: Use Faster-Whisper for transcription (4-5x faster)
         embedding_method: Embedding method ('standard', 'fast', 'gpu')
+        video_title: Video title (for YouTube videos, used as context for translation)
     """
     if not os.path.exists(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
@@ -125,7 +127,8 @@ def generate_subtitle(
                 source_lang, 
                 target_lang,
                 use_deepseek=use_deepseek,
-                deepseek_api_key=deepseek_key
+                deepseek_api_key=deepseek_key,
+                video_title=video_title
             )
             
             # Save temporary subtitle for embedding
@@ -149,6 +152,9 @@ def generate_subtitle(
             }
             
             print_summary(summary_data)
+            
+            # Return output video path for cleanup
+            return output_video
 
         
     finally:
@@ -175,6 +181,8 @@ def parse_arguments():
     lang = None
     deepseek_flag = None  # None means ask user
     faster_flag = None  # None means ask user
+    video_source = None  # None means ask user
+    video_input = None  # URL or file path
     
     i = 1
     while i < len(sys.argv):
@@ -191,10 +199,18 @@ def parse_arguments():
         elif arg == "--faster":
             faster_flag = True
             i += 1
+        elif arg in ["-url", "--url"] and i + 1 < len(sys.argv):
+            video_source = "youtube"
+            video_input = sys.argv[i + 1]
+            i += 2
+        elif arg in ["-l", "--local"] and i + 1 < len(sys.argv):
+            video_source = "local"
+            video_input = sys.argv[i + 1]
+            i += 2
         else:
             i += 1
     
-    return model, lang, deepseek_flag, faster_flag
+    return model, lang, deepseek_flag, faster_flag, video_source, video_input
 
 
 def ask_faster_whisper():
@@ -272,39 +288,58 @@ def ask_deepseek():
 def ask_embedding_method():
     """Ask user for embedding method"""
     from utils.ui import console
+    from utils.video_embedder import check_gpu_available
     
-    console.print("\n[bold cyan]Choose Embedding Method:[/bold cyan]")
-    
-    console.print("\n[bold yellow]1. Standard Quality (Default)[/bold yellow]")
-    console.print("   [green]Kelebihan:[/green]")
-    console.print("   [dim]✓ Kualitas terbaik[/dim]")
-    console.print("   [dim]✓ Compatible dengan semua player[/dim]")
-    console.print("   [red]Kekurangan:[/red]")
-    console.print("   [dim]✗ Paling lambat (~12-13 menit untuk video 17 menit)[/dim]")
-    
-    console.print("\n[bold green]2. Fast Encoding (Recommended)[/bold green]")
-    console.print("   [green]Kelebihan:[/green]")
-    console.print("   [dim]✓ 2-3x lebih cepat (~4-6 menit untuk video 17 menit)[/dim]")
-    console.print("   [dim]✓ Kualitas masih bagus[/dim]")
-    console.print("   [dim]✓ File size sedikit lebih besar[/dim]")
-    console.print("   [red]Kekurangan:[/red]")
-    console.print("   [dim]✗ Kualitas sedikit turun (barely noticeable)[/dim]")
-    
-    console.print("\n[bold magenta]3. GPU Accelerated (Fastest)[/bold magenta]")
-    console.print("   [green]Kelebihan:[/green]")
-    console.print("   [dim]✓ 3-5x lebih cepat (~2-3 menit untuk video 17 menit)[/dim]")
-    console.print("   [dim]✓ Kualitas hampir sama dengan standard[/dim]")
-    console.print("   [red]Kekurangan:[/red]")
-    console.print("   [dim]✗ Butuh NVIDIA GPU[/dim]")
+    # Check GPU availability once
+    gpu_available = check_gpu_available()
     
     while True:
+        console.print("\n[bold cyan]Choose Embedding Method:[/bold cyan]")
+        
+        console.print("\n[bold yellow]1. Standard Quality (Default)[/bold yellow]")
+        console.print("   [green]Kelebihan:[/green]")
+        console.print("   [dim]✓ Kualitas terbaik[/dim]")
+        console.print("   [dim]✓ Compatible dengan semua player[/dim]")
+        console.print("   [red]Kekurangan:[/red]")
+        console.print("   [dim]✗ Paling lambat (~12-13 menit untuk video 17 menit)[/dim]")
+        
+        console.print("\n[bold green]2. Fast Encoding (Recommended)[/bold green]")
+        console.print("   [green]Kelebihan:[/green]")
+        console.print("   [dim]✓ 2-3x lebih cepat (~4-6 menit untuk video 17 menit)[/dim]")
+        console.print("   [dim]✓ Kualitas masih bagus[/dim]")
+        console.print("   [dim]✓ File size sedikit lebih besar[/dim]")
+        console.print("   [red]Kekurangan:[/red]")
+        console.print("   [dim]✗ Kualitas sedikit turun (barely noticeable)[/dim]")
+        
+        # Show GPU option with availability status
+        if gpu_available:
+            console.print("\n[bold magenta]3. GPU Accelerated (Fastest) ✓ Available[/bold magenta]")
+        else:
+            console.print("\n[bold magenta]3. GPU Accelerated (Fastest) ✗ Not Available[/bold magenta]")
+        
+        console.print("   [green]Kelebihan:[/green]")
+        console.print("   [dim]✓ 3-5x lebih cepat (~2-3 menit untuk video 17 menit)[/dim]")
+        console.print("   [dim]✓ Kualitas hampir sama dengan standard[/dim]")
+        console.print("   [red]Kekurangan:[/red]")
+        console.print("   [dim]✗ Butuh NVIDIA GPU[/dim]")
+        
         console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1, 2, or 3):[/white] ", end="")
         choice = input().strip()
+        
         if choice == "1":
             return 'standard'
         elif choice == "2":
             return 'fast'
         elif choice == "3":
+            # Validate GPU availability
+            if not gpu_available:
+                console.print("\n[bold red]❌ NVIDIA GPU not detected![/bold red]")
+                console.print("[yellow]GPU Accelerated encoding requires NVIDIA GPU with CUDA support.[/yellow]")
+                console.print("[yellow]Please choose option 1 or 2.[/yellow]")
+                console.print("\n[dim]Press Enter to continue...[/dim]")
+                input()
+                # Loop back to show menu again
+                continue
             return 'gpu'
         else:
             console.print("[yellow]Please enter 1, 2, or 3[/yellow]")
@@ -371,26 +406,40 @@ def get_local_file():
 
 def main():
     """Main entry point"""
-    model, lang, deepseek_flag, faster_flag = parse_arguments()
+    model, lang, deepseek_flag, faster_flag, video_source, video_input = parse_arguments()
     
-    # Ask for video source
-    video_source = ask_video_source()
+    # If video source not provided via command line, ask user
+    if video_source is None:
+        video_source = ask_video_source()
     
+    # Process based on video source
     if video_source == "youtube":
-        # Get YouTube URL
-        youtube_url = get_youtube_url()
+        # Get YouTube URL (from command line or ask user)
+        if video_input is None:
+            youtube_url = get_youtube_url()
+        else:
+            youtube_url = video_input
         
         # Download YouTube video
         from utils.youtube_downloader import download_youtube_video
         try:
-            video_file = download_youtube_video(youtube_url)
+            video_file, video_title = download_youtube_video(youtube_url)
         except Exception as e:
             from utils.ui import print_error
             print_error(f"Failed to download YouTube video: {str(e)}")
             sys.exit(1)
     else:
-        # Get local file path
-        video_file = get_local_file()
+        video_title = None  # No title for local files
+        # Get local file path (from command line or ask user)
+        if video_input is None:
+            video_file = get_local_file()
+        else:
+            video_file = video_input
+            # Validate file exists
+            if not os.path.exists(video_file):
+                from utils.ui import print_error
+                print_error(f"Video file not found: {video_file}")
+                sys.exit(1)
     
     # Default: always translate and embed
     translate_flag = True
@@ -424,7 +473,7 @@ def main():
     print_info("Output", "Video with embedded subtitle")
     
     try:
-        generate_subtitle(
+        output_video = generate_subtitle(
             video_file, 
             model_size=model, 
             language=lang, 
@@ -432,8 +481,21 @@ def main():
             embed_to_video=embed_flag,
             use_deepseek=deepseek_flag,
             use_faster_whisper=faster_flag,
-            embedding_method=embedding_method
+            embedding_method=embedding_method,
+            video_title=video_title if video_source == "youtube" else None
         )
+        
+        # Clean up original YouTube video after successful generation
+        if video_source == "youtube" and output_video:
+            try:
+                if os.path.exists(video_file):
+                    os.remove(video_file)
+                    from utils.ui import print_substep
+                    print_substep(f"Cleaned up original video: {video_file}")
+            except Exception as e:
+                from utils.ui import print_warning
+                print_warning(f"Failed to delete original video: {str(e)}")
+        
     except KeyboardInterrupt:
         from utils.ui import print_warning
         print_warning("\nProcess interrupted by user")

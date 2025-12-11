@@ -86,7 +86,7 @@ Return only the numbered translations, nothing else."""
         return texts
 
 
-def translate_with_deepseek(subs, source_lang, target_lang, api_key):
+def translate_with_deepseek(subs, source_lang, target_lang, api_key, video_title=None):
     """
     Translate subtitles using DeepSeek AI
     
@@ -95,10 +95,22 @@ def translate_with_deepseek(subs, source_lang, target_lang, api_key):
     - Context-aware translation
     - Batch processing (10x faster)
     - Understands video topic
+    
+    Args:
+        subs: Subtitle entries
+        source_lang: Source language code
+        target_lang: Target language code
+        api_key: DeepSeek API key
+        video_title: Video title (optional, used as additional context)
     """
     # Get video context from first few subtitles
     print_substep("Analyzing video context...")
     context = get_video_context(subs, sample_size=5)
+    
+    # Add video title to context if available
+    if video_title:
+        context = f"Video Title: {video_title}\n\n{context}"
+        print_substep(f"Using video title as context: {video_title}")
     
     # Batch processing for DeepSeek
     batch_size = 10
