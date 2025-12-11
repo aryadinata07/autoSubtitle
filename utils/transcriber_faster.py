@@ -22,14 +22,22 @@ def transcribe_audio_faster(audio_path, model_size="base", language=None):
     print_substep("Using optimized CTranslate2 backend (4-5x faster)...")
     
     # Load model with CPU or GPU
-    try:
-        # Try GPU first
-        model = WhisperModel(model_size, device="cuda", compute_type="float16")
-        print_substep("Using GPU acceleration")
-    except:
-        # Fallback to CPU
+    # Check if user wants to force CPU mode (for cuDNN issues)
+    force_cpu = os.environ.get('CUDA_VISIBLE_DEVICES') == '-1'
+    
+    if force_cpu:
+        print_substep("Forcing CPU mode (CUDA_VISIBLE_DEVICES=-1)")
         model = WhisperModel(model_size, device="cpu", compute_type="int8")
-        print_substep("Using CPU (GPU not available)")
+    else:
+        try:
+            # Try GPU first
+            model = WhisperModel(model_size, device="cuda", compute_type="float16")
+            print_substep("Using GPU acceleration")
+        except Exception as e:
+            # Fallback to CPU if GPU fails
+            print_substep(f"GPU initialization failed: {str(e)[:50]}...")
+            print_substep("Falling back to CPU mode")
+            model = WhisperModel(model_size, device="cpu", compute_type="int8")
     
     print_success("Model loaded successfully")
     
