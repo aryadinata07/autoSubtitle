@@ -27,13 +27,26 @@ def check_gpu_available():
     """Check if NVIDIA GPU is available for hardware acceleration"""
     import subprocess
     try:
+        # Check if nvidia-smi exists (NVIDIA GPU driver)
         result = subprocess.run(
+            ['nvidia-smi'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if result.returncode != 0:
+            return False
+        
+        # Also check if ffmpeg supports cuda
+        result2 = subprocess.run(
             ['ffmpeg', '-hwaccels'],
             capture_output=True,
             text=True,
             timeout=5
         )
-        return 'cuda' in result.stdout.lower()
+        
+        return 'cuda' in result2.stdout.lower() and result.returncode == 0
     except:
         return False
 
