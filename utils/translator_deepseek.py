@@ -1,100 +1,168 @@
-"""DeepSeek AI translation implementation"""
+"""DeepSeek AI translation implementation - Optimized Version"""
 from openai import OpenAI
 from tqdm import tqdm
-from .ui import print_substep, print_warning
+import time
+from .ui import print_substep, print_warning, print_step
 
 
 def get_video_context(subs, sample_size=5):
     """Get video context from first few subtitles to understand the topic"""
     sample_texts = []
-    for i, sub in enumerate(subs[:sample_size]):
-        sample_texts.append(sub.text)
+    total = len(subs)
+    
+    # Sample dari awal
+    indices = [i for i in range(min(sample_size, total))]
+    
+    # Tambah sample dari tengah untuk gambaran lebih lengkap
+    if total > 20:
+        indices.extend([total // 2, (total // 2) + 1])
+    
+    for i in indices:
+        if i < total:
+            sample_texts.append(subs[i].text)
+    
     return " ".join(sample_texts)
 
 
-def translate_batch_with_deepseek(texts, source_lang, target_lang, api_key, context=""):
+def translate_batch_with_deepseek(texts, source_lang, target_lang, api_key, global_context="", prev_context=""):
     """
-    Translate multiple texts in one request using DeepSeek API
+    Translate multiple texts with persistent context + sliding window
     
     Features:
-    - Batch processing (10 subtitles per request)
-    - Context-aware translation
-    - Natural and conversational output
+    - Global context di setiap batch (no amnesia!)
+    - Sliding window: kirim 1 kalimat terakhir batch sebelumnya
+    - Natural Indonesian slang mode
     """
     try:
         client = OpenAI(
             api_key=api_key,
             base_url="https://api.deepseek.com",
-            timeout=60.0  # Add timeout to prevent hanging
+            timeout=90.0
         )
         
         lang_map = {
             'en': 'English',
-            'id': 'Indonesian'
+            'id': 'Indonesian (Bahasa Gaul/Santai)',
+            'ja': 'Japanese',
+            'es': 'Spanish',
+            'fr': 'French',
+            'de': 'German',
+            'zh': 'Chinese'
         }
         
         source_name = lang_map.get(source_lang, source_lang)
         target_name = lang_map.get(target_lang, target_lang)
         
-        # Create numbered list for batch translation
+        # Create numbered list
         numbered_texts = "\n".join([f"{i+1}. {text}" for i, text in enumerate(texts)])
         
-        context_info = f"\n\nVideo context: {context}" if context else ""
+        # Build context instruction
+        context_instruction = ""
+        if global_context:
+            context_instruction += f"\n[Global Video Context]: {global_context}"
+        if prev_context:
+            context_instruction += f"\n[Previous Sentence]: ...{prev_context}"
         
-        prompt = f"""Translate the following subtitle texts from {source_name} to {target_name}.
-These are video subtitles, so translate naturally and conversationally (not too formal or stiff).
-Keep the same numbering format in your response.{context_info}
+        # System prompt: Netflix/YouTube style
+        system_prompt = f"""You are a pro subtitle translator for Netflix/YouTube.
+Target: {target_name}.
+Style: Conversational, natural, concise, and punchy.
 
+Rules:
+1. Maintain timing/length constraints roughly
+2. Use slang/idioms appropriate for context (don't be robotic)
+3. If input is incomplete, assume it connects to the context
+4. Return ONLY the numbered list, no explanations"""
+        
+        user_prompt = f"""Translate these subtitles from {source_name} to {target_name}.
+{context_instruction}
+
+Subtitles to translate:
 {numbered_texts}
 
-Return only the numbered translations, nothing else."""
+Output only the numbered translations:"""
         
         response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "You are a professional subtitle translator. Translate naturally and conversationally, maintaining the casual tone of spoken language. Avoid overly formal or stiff translations."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
             ],
-            temperature=0.5,  # Slightly higher for more natural language
-            max_tokens=2000
+            temperature=0.3,  # Lower untuk konsistensi
+            max_tokens=4000  # Naikkan untuk subtitle panjang
         )
         
-        # Parse response to extract translations
         response_text = response.choices[0].message.content.strip()
+        
+        # IMPROVED PARSING: Handle multi-line responses better
         translations = []
+        current_translation = ""
+        current_index = -1
         
         for line in response_text.split('\n'):
             line = line.strip()
+            
+            # Check if line starts with a number (new translation)
             if line and len(line) > 0 and line[0].isdigit():
-                # Remove number prefix (e.g., "1. " or "1) ")
+                # Save previous translation if exists
+                if current_index >= 0 and current_translation:
+                    translations.append(current_translation.strip())
+                
+                # Parse new translation
                 parts = line.split('.', 1)
                 if len(parts) > 1:
-                    translations.append(parts[1].strip())
+                    try:
+                        current_index = int(parts[0])
+                        current_translation = parts[1].strip()
+                    except ValueError:
+                        # Not a valid number, skip
+                        pass
                 else:
                     parts = line.split(')', 1)
                     if len(parts) > 1:
-                        translations.append(parts[1].strip())
+                        try:
+                            current_index = int(parts[0])
+                            current_translation = parts[1].strip()
+                        except ValueError:
+                            pass
+            elif current_index >= 0 and line:
+                # Continuation of previous translation (multi-line)
+                current_translation += " " + line
         
-        # If parsing failed, return original texts
-        if len(translations) != len(texts):
+        # Don't forget the last translation
+        if current_index >= 0 and current_translation:
+            translations.append(current_translation.strip())
+        
+        # RELAXED VALIDATION: Allow slight mismatch (DeepSeek might merge short subtitles)
+        if len(translations) == 0:
             return texts
         
+        # If count doesn't match, try to handle it gracefully
+        if len(translations) != len(texts):
+            # If we got fewer translations, pad with originals
+            if len(translations) < len(texts):
+                while len(translations) < len(texts):
+                    translations.append(texts[len(translations)])
+            # If we got more, truncate
+            elif len(translations) > len(texts):
+                translations = translations[:len(texts)]
+        
         return translations
+    
     except Exception as e:
-        # Return original texts if API call fails
         print(f"DeepSeek API error: {str(e)}")
         return texts
 
 
 def translate_with_deepseek(subs, source_lang, target_lang, api_key, video_title=None):
     """
-    Translate subtitles using DeepSeek AI
+    Translate subtitles using DeepSeek AI with persistent context
     
     Features:
-    - More natural and conversational
-    - Context-aware translation
+    - NO AMNESIA: Global context di setiap batch
+    - Sliding window: Flow mulus antar batch
+    - Natural Indonesian slang mode
     - Batch processing (10x faster)
-    - Understands video topic
     
     Args:
         subs: Subtitle entries
@@ -103,41 +171,40 @@ def translate_with_deepseek(subs, source_lang, target_lang, api_key, video_title
         api_key: DeepSeek API key
         video_title: Video title (optional, used as additional context)
     """
-    # Get video context from first few subtitles
-    print_substep("Analyzing video context...")
-    context = get_video_context(subs, sample_size=5)
+    print_step(3, 4, "Translating with DeepSeek AI...")
     
-    # Add video title to context if available
+    # Get global video context
+    context = get_video_context(subs)
     if video_title:
-        context = f"Video Title: {video_title}\n\n{context}"
-        print_substep(f"Using video title as context: {video_title}")
+        context = f"Title: {video_title}. Content Summary: {context}"
     
-    # Batch processing for DeepSeek
+    print_substep(f"Context loaded: {len(context)} chars")
+    
+    # Batch processing
     batch_size = 10
     total_batches = (len(subs) + batch_size - 1) // batch_size
     
-    print_substep(f"Processing {len(subs)} subtitles in {total_batches} batches...")
+    # Sliding window: simpan kalimat terakhir batch sebelumnya
+    last_sentence_context = ""
     
-    from tqdm import tqdm
-    import time
-    
-    with tqdm(total=len(subs), desc="      Translating", unit="subtitle", ncols=80) as pbar:
+    with tqdm(total=len(subs), desc="Translating", unit="sub", ncols=80) as pbar:
         for i in range(0, len(subs), batch_size):
             batch = subs[i:i + batch_size]
             texts = [sub.text for sub in batch]
-            batch_num = i // batch_size + 1
             
             try:
-                # Add small delay to avoid rate limiting
+                # Rate limiting
                 if i > 0:
-                    time.sleep(0.5)
+                    time.sleep(0.2)
                 
+                # PERBAIKAN FATAL: Kirim global_context di SETIAP batch
                 translations = translate_batch_with_deepseek(
                     texts,
                     source_lang,
                     target_lang,
                     api_key,
-                    context=context if i == 0 else ""  # Only send context on first batch
+                    global_context=context,  # Selalu kirim!
+                    prev_context=last_sentence_context  # Sliding window
                 )
                 
                 # Apply translations
@@ -145,10 +212,13 @@ def translate_with_deepseek(subs, source_lang, target_lang, api_key, video_title
                     if j < len(translations):
                         sub.text = translations[j]
                     pbar.update(1)
-                    
+                
+                # Update sliding window dengan kalimat terakhir batch ini
+                if translations:
+                    last_sentence_context = translations[-1]
+            
             except Exception as e:
-                print_warning(f"Failed to translate batch {batch_num}: {str(e)}")
-                # Keep original text if translation fails
+                print_warning(f"Batch failed: {str(e)}")
                 pbar.update(len(batch))
     
     return subs

@@ -19,6 +19,8 @@ from utils import (
     embed_subtitle_to_video,
     create_dubbed_audio,
     mix_audio_with_video,
+    adjust_subtitle_timing,
+    optimize_subtitle_gaps,
 )
 from utils.ui import (
     print_header,
@@ -77,6 +79,10 @@ def generate_subtitle(
         # Transcribe
         result = transcribe_audio(audio_path, model_size, language, use_faster=use_faster_whisper)
         detected_lang = result.get("language", "unknown")
+        
+        # Adjust subtitle timing
+        result["segments"] = adjust_subtitle_timing(result["segments"])
+        result["segments"] = optimize_subtitle_gaps(result["segments"])
         
         # Auto-translate if requested
         if translate:
@@ -141,6 +147,11 @@ def generate_subtitle(
             # Save temporary subtitle for embedding
             base_name = os.path.splitext(output_srt)[0]
             temp_srt = f"{base_name}_{target_lang}_temp.srt"
+            
+            # Hapus file temporary lama jika ada
+            if os.path.exists(temp_srt):
+                os.remove(temp_srt)
+            
             translated_subs.save(temp_srt, encoding="utf-8")
             
             # Generate dubbed audio if requested

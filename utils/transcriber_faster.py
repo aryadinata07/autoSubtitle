@@ -72,6 +72,12 @@ def transcribe_audio_faster(audio_path, model_size="base", language=None):
     print_substep(f"Language: {language if language else 'auto-detect'}")
     print_substep(f"Please wait, this may take a few minutes...")
     
+    # Get VAD settings from environment
+    from dotenv import load_dotenv
+    load_dotenv()
+    vad_min_silence = int(os.getenv('VAD_MIN_SILENCE_MS', '700'))
+    print_substep(f"VAD min silence: {vad_min_silence}ms")
+    
     # Transcribe with auto-retry on cuDNN errors
     result_segments = []
     detected_lang = 'unknown'
@@ -83,7 +89,8 @@ def transcribe_audio_faster(audio_path, model_size="base", language=None):
             language=language,
             beam_size=5,
             vad_filter=True,  # Voice activity detection
-            vad_parameters=dict(min_silence_duration_ms=500)
+            vad_parameters=dict(min_silence_duration_ms=vad_min_silence),
+            word_timestamps=True  # GAME CHANGER: Akurasi timing level kata
         )
         
         # Convert segments to list (error might happen here during iteration)
@@ -92,7 +99,7 @@ def transcribe_audio_faster(audio_path, model_size="base", language=None):
                 result_segments.append({
                     'start': segment.start,
                     'end': segment.end,
-                    'text': segment.text
+                    'text': segment.text.strip()  # Bersihkan spasi tidak perlu
                 })
         except Exception as seg_error:
             # Check if it's a cuDNN error during segment iteration
@@ -133,7 +140,8 @@ def transcribe_audio_faster(audio_path, model_size="base", language=None):
             language=language,
             beam_size=5,
             vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=500)
+            vad_parameters=dict(min_silence_duration_ms=vad_min_silence),
+            word_timestamps=True  # GAME CHANGER: Akurasi timing level kata
         )
         
         # Convert segments to list
@@ -142,7 +150,7 @@ def transcribe_audio_faster(audio_path, model_size="base", language=None):
             result_segments.append({
                 'start': segment.start,
                 'end': segment.end,
-                'text': segment.text
+                'text': segment.text.strip()  # Bersihkan spasi tidak perlu
             })
         
         detected_lang = info.language if hasattr(info, 'language') else 'unknown'
