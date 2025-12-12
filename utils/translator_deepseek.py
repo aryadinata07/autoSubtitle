@@ -63,24 +63,27 @@ def translate_batch_with_deepseek(texts, source_lang, target_lang, api_key, glob
         if prev_context:
             context_instruction += f"\n[Previous Sentence]: ...{prev_context}"
         
-        # System prompt: Netflix/YouTube style
-        system_prompt = f"""You are a pro subtitle translator for Netflix/YouTube.
+        # System prompt: Strict line-by-line + Punctuation awareness
+        system_prompt = f"""You are a professional subtitle translator.
 Target: {target_name}.
-Style: Conversational, natural, concise, and punchy.
+Style: Natural, conversational, slang allowed.
 
-Rules:
-1. Maintain timing/length constraints roughly
-2. Use slang/idioms appropriate for context (don't be robotic)
-3. If input is incomplete, assume it connects to the context
-4. Return ONLY the numbered list, no explanations"""
+CRITICAL RULES:
+1. Translate LINE-BY-LINE. DO NOT MERGE LINES.
+2. Even if a sentence is split across lines, keep it split.
+3. OUTPUT MUST HAVE EXACTLY {len(texts)} LINES.
+4. Return ONLY the numbered list (e.g. "1. translation").
+5. PUNCTUATION MATTERS: If the input sentence is incomplete/continues to next line, DO NOT put a period (.) at the end. Only use periods/question marks/exclamation marks if the thought is completely finished.
+6. No explanations, no extra text."""
         
-        user_prompt = f"""Translate these subtitles from {source_name} to {target_name}.
+        user_prompt = f"""Translate these {len(texts)} lines from {source_name} to {target_name}.
+Keep the exact same number of lines. Do not merge text.
 {context_instruction}
 
-Subtitles to translate:
+Input:
 {numbered_texts}
 
-Output only the numbered translations:"""
+Output ({len(texts)} lines):"""
         
         response = client.chat.completions.create(
             model="deepseek-chat",
@@ -88,50 +91,27 @@ Output only the numbered translations:"""
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.3,  # Lower untuk konsistensi
-            max_tokens=4000  # Naikkan untuk subtitle panjang
+            temperature=0.1,  # Lower untuk strict compliance
+            max_tokens=4000
         )
         
         response_text = response.choices[0].message.content.strip()
         
-        # IMPROVED PARSING: Handle multi-line responses better
+        # ROBUST PARSING: Regex-based line-by-line extraction
         translations = []
-        current_translation = ""
-        current_index = -1
+        import re
         
         for line in response_text.split('\n'):
             line = line.strip()
+            if not line:
+                continue
             
-            # Check if line starts with a number (new translation)
-            if line and len(line) > 0 and line[0].isdigit():
-                # Save previous translation if exists
-                if current_index >= 0 and current_translation:
-                    translations.append(current_translation.strip())
-                
-                # Parse new translation
-                parts = line.split('.', 1)
-                if len(parts) > 1:
-                    try:
-                        current_index = int(parts[0])
-                        current_translation = parts[1].strip()
-                    except ValueError:
-                        # Not a valid number, skip
-                        pass
-                else:
-                    parts = line.split(')', 1)
-                    if len(parts) > 1:
-                        try:
-                            current_index = int(parts[0])
-                            current_translation = parts[1].strip()
-                        except ValueError:
-                            pass
-            elif current_index >= 0 and line:
-                # Continuation of previous translation (multi-line)
-                current_translation += " " + line
-        
-        # Don't forget the last translation
-        if current_index >= 0 and current_translation:
-            translations.append(current_translation.strip())
+            # Regex: Match "1. Text" or "1) Text" or "1 Text"
+            match = re.match(r'^\d+[\.\)\s]+(.*)', line)
+            if match:
+                translation = match.group(1).strip()
+                if translation:  # Only add non-empty translations
+                    translations.append(translation)
         
         # RELAXED VALIDATION: Allow slight mismatch (DeepSeek might merge short subtitles)
         if len(translations) == 0:
@@ -180,8 +160,8 @@ def translate_with_deepseek(subs, source_lang, target_lang, api_key, video_title
     
     print_substep(f"Context loaded: {len(context)} chars")
     
-    # Batch processing
-    batch_size = 10
+    # Batch processing - Balanced size (not too big, not too small)
+    batch_size = 8  # Sweet spot: fast enough, accurate enough
     total_batches = (len(subs) + batch_size - 1) // batch_size
     
     # Sliding window: simpan kalimat terakhir batch sebelumnya

@@ -48,8 +48,9 @@ DEEPSEEK_API_KEY=your_api_key_here
 # Whisper Mode (1=Faster-Whisper, 2=Regular Whisper)
 WHISPER_MODE=1
 
-# Subtitle Styling (minimal, standard, bold)
-SUBTITLE_PRESET=minimal
+# Subtitle Styling (auto, minimal, standard, bold, reels, reels-bold)
+# 'auto' will automatically detect video orientation and choose the best preset
+SUBTITLE_PRESET=auto
 
 # Subtitle Position (bottom, top, center)
 SUBTITLE_POSITION=bottom
@@ -181,9 +182,12 @@ Configure in `.env`: `WHISPER_MODE=1` (Faster) or `WHISPER_MODE=2` (Regular)
 Configure in `.env`:
 
 **Presets:**
-- `minimal` - Small font, thin outline, doesn't distract from video (Recommended)
+- `auto` - **Auto-detect based on video orientation** (vertical → reels, horizontal → minimal) [RECOMMENDED]
+- `minimal` - Small font, thin outline, doesn't distract from video (for landscape videos)
 - `standard` - Balanced, readable but not too dominant
 - `bold` - Large font, thick outline, for better readability
+- `reels` - Extra small font, optimized for vertical videos (Instagram Reels, TikTok, YouTube Shorts)
+- `reels-bold` - Small font with better visibility for vertical videos
 
 **Position:**
 - `bottom` - Bottom position (default)

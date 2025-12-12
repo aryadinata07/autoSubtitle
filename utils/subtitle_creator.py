@@ -5,14 +5,61 @@ from tqdm import tqdm
 from .ui import print_step, print_success
 
 
-def get_subtitle_styling():
-    """Get subtitle styling from environment variables"""
+def detect_video_orientation(video_path):
+    """
+    Detect if video is vertical (portrait) or horizontal (landscape)
+    Returns: 'vertical' or 'horizontal'
+    """
+    try:
+        import subprocess
+        import json
+        
+        cmd = [
+            'ffprobe',
+            '-v', 'quiet',
+            '-print_format', 'json',
+            '-show_streams',
+            video_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        data = json.loads(result.stdout)
+        
+        # Find video stream
+        for stream in data.get('streams', []):
+            if stream.get('codec_type') == 'video':
+                width = int(stream.get('width', 0))
+                height = int(stream.get('height', 0))
+                
+                if width > 0 and height > 0:
+                    # Vertical if height > width (e.g., 1080x1920 for Reels)
+                    return 'vertical' if height > width else 'horizontal'
+        
+        return 'horizontal'  # Default
+    except:
+        return 'horizontal'  # Default on error
+
+
+def get_subtitle_styling(video_path=None):
+    """Get subtitle styling from environment variables with auto-detection"""
     from dotenv import load_dotenv
     load_dotenv()
     
     # Get preset
-    preset = os.getenv('SUBTITLE_PRESET', 'minimal').lower()
+    preset = os.getenv('SUBTITLE_PRESET', 'auto').lower()
     position = os.getenv('SUBTITLE_POSITION', 'bottom').lower()
+    
+    # Auto-detect if preset is 'auto' and video path is provided
+    if preset == 'auto' and video_path:
+        orientation = detect_video_orientation(video_path)
+        if orientation == 'vertical':
+            preset = 'reels'
+            from .ui import print_substep
+            print_substep("Auto-detected vertical video, using 'reels' preset")
+        else:
+            preset = 'minimal'
+            from .ui import print_substep
+            print_substep("Auto-detected horizontal video, using 'minimal' preset")
     
     # Preset configurations
     presets = {
@@ -32,6 +79,18 @@ def get_subtitle_styling():
             'font_size': 20,
             'outline': 2,
             'margin': 20,
+            'shadow': 1
+        },
+        'reels': {
+            'font_size': 11,  # Lebih kecil untuk layar vertikal
+            'outline': 1,
+            'margin': 8,      # Margin lebih kecil
+            'shadow': 0
+        },
+        'reels-bold': {
+            'font_size': 13,  # Sedikit lebih besar tapi tetap compact
+            'outline': 1.5,
+            'margin': 10,
             'shadow': 1
         }
     }
@@ -66,13 +125,13 @@ def get_subtitle_styling():
     return style
 
 
-def create_srt(segments, output_path):
+def create_srt(segments, output_path, video_path=None):
     """Create SRT subtitle file from segments with styling"""
     print_step(3, 3, "Creating subtitle file")
     subs = pysrt.SubRipFile()
     
-    # Get styling configuration
-    style = get_subtitle_styling()
+    # Get styling configuration with auto-detection
+    style = get_subtitle_styling(video_path)
     
     for i, segment in enumerate(
         tqdm(segments, desc="      Processing segments", unit="segment"), start=1

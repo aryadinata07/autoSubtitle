@@ -144,6 +144,25 @@ def generate_subtitle(
                 video_title=video_title
             )
             
+            # Apply styling to translated subtitles (with auto-detection)
+            from utils.subtitle_creator import get_subtitle_styling
+            style = get_subtitle_styling(video_path)
+            
+            # Apply ASS styling tags to each subtitle
+            for sub in translated_subs:
+                text = sub.text.strip()
+                styling = (
+                    f"{{\\fs{style['font_size']}"
+                    f"\\b0"
+                    f"\\c&HFFFFFF&"
+                    f"\\3c&H000000&"
+                    f"\\bord{style['outline']}"
+                    f"\\shad{style['shadow']}"
+                    f"\\a{style['alignment']}"
+                    f"\\MarginV={style['margin_v']}}}"
+                )
+                sub.text = f"{styling}{text}"
+            
             # Save temporary subtitle for embedding
             base_name = os.path.splitext(output_srt)[0]
             temp_srt = f"{base_name}_{target_lang}_temp.srt"
