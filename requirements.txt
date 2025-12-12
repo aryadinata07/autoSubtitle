@@ -9,3 +9,7 @@ rich
 openai
 python-dotenv
 yt-dlp
+gtts
+pydub
+pyttsx3
+audioop-lts

@@ -2,6 +2,10 @@
 import os
 import sys
 import pysrt
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Disable huggingface symlinks warning on Windows
 os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
@@ -13,6 +17,8 @@ from utils import (
     translate_subtitles,
     determine_translation_direction,
     embed_subtitle_to_video,
+    create_dubbed_audio,
+    mix_audio_with_video,
 )
 from utils.ui import (
     print_header,
@@ -34,6 +40,7 @@ def generate_subtitle(
     use_faster_whisper=False,
     embedding_method='standard',
     video_title=None,
+    dubbing_method=None,
 ):
     """
     Generate subtitle from video file
@@ -136,8 +143,40 @@ def generate_subtitle(
             temp_srt = f"{base_name}_{target_lang}_temp.srt"
             translated_subs.save(temp_srt, encoding="utf-8")
             
+            # Generate dubbed audio if requested
+            video_to_embed = video_path
+            if dubbing_method:
+                # Convert translated subtitles to segments format
+                dubbed_segments = []
+                for sub in translated_subs:
+                    dubbed_segments.append({
+                        'text': sub.text,
+                        'start': sub.start.ordinal / 1000.0,  # Convert to seconds
+                        'end': sub.end.ordinal / 1000.0
+                    })
+                
+                # Generate dubbed audio
+                dubbed_audio_path = create_dubbed_audio(
+                    dubbed_segments,
+                    method=dubbing_method,
+                    target_lang=target_lang
+                )
+                
+                if dubbed_audio_path:
+                    # Mix dubbed audio with video
+                    dubbed_video_path = mix_audio_with_video(
+                        video_path,
+                        dubbed_audio_path,
+                        output_path=f"{base_name}_dubbed_temp.mp4"
+                    )
+                    video_to_embed = dubbed_video_path
+                    
+                    # Cleanup dubbed audio
+                    if os.path.exists(dubbed_audio_path):
+                        os.remove(dubbed_audio_path)
+            
             # Embed to video
-            output_video = embed_subtitle_to_video(video_path, temp_srt, method=embedding_method)
+            output_video = embed_subtitle_to_video(video_to_embed, temp_srt, method=embedding_method)
             
             # Delete temporary SRT file
             if os.path.exists(temp_srt):
@@ -213,41 +252,7 @@ def parse_arguments():
     return model, lang, deepseek_flag, faster_flag, video_source, video_input
 
 
-def ask_faster_whisper():
-    """Ask user if they want to use Faster-Whisper"""
-    from utils.ui import console
-    
-    console.print("\n[bold cyan]Choose Transcription Method:[/bold cyan]")
-    
-    console.print("\n[bold yellow]1. Regular Whisper (Default)[/bold yellow]")
-    console.print("   [green]Kelebihan:[/green]")
-    console.print("   [dim]✓ Standard implementation dari OpenAI[/dim]")
-    console.print("   [dim]✓ Reliable dan well-tested[/dim]")
-    console.print("   [dim]✓ Akurasi bagus untuk semua bahasa[/dim]")
-    console.print("   [dim]✓ Tidak perlu install library tambahan[/dim]")
-    console.print("   [red]Kekurangan:[/red]")
-    console.print("   [dim]✗ Lebih lambat (10 menit video = ~10 menit proses)[/dim]")
-    console.print("   [dim]✗ Memory usage lebih tinggi[/dim]")
-    
-    console.print("\n[bold green]2. Faster-Whisper (Recommended)[/bold green]")
-    console.print("   [green]Kelebihan:[/green]")
-    console.print("   [dim]✓ 4-5x lebih cepat (10 menit video = ~2 menit proses)[/dim]")
-    console.print("   [dim]✓ Memory usage 50% lebih rendah[/dim]")
-    console.print("   [dim]✓ Akurasi sama dengan Regular Whisper[/dim]")
-    console.print("   [dim]✓ Support GPU acceleration (CUDA)[/dim]")
-    console.print("   [dim]✓ Optimized dengan CTranslate2[/dim]")
-    console.print("   [red]Kekurangan:[/red]")
-    console.print("   [dim]✗ Perlu install faster-whisper library[/dim]")
-    
-    while True:
-        console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1 or 2):[/white] ", end="")
-        choice = input().strip()
-        if choice == "1":
-            return False
-        elif choice == "2":
-            return True
-        else:
-            console.print("[yellow]Please enter 1 or 2[/yellow]")
+
 
 
 def ask_deepseek():
@@ -257,22 +262,22 @@ def ask_deepseek():
     console.print("\n[bold cyan]Choose Translation Method:[/bold cyan]")
     
     console.print("\n[bold yellow]1. Google Translate (Default - Free)[/bold yellow]")
-    console.print("   [green]Kelebihan:[/green]")
-    console.print("   [dim]✓ Gratis, tidak perlu API key[/dim]")
-    console.print("   [dim]✓ Cepat dan reliable[/dim]")
-    console.print("   [dim]✓ Bagus untuk terjemahan basic[/dim]")
-    console.print("   [red]Kekurangan:[/red]")
-    console.print("   [dim]✗ Kadang terlalu literal/kaku[/dim]")
-    console.print("   [dim]✗ Tidak context-aware[/dim]")
+    console.print("   [green]Pros:[/green]")
+    console.print("   [dim]✓ Free, no API key required[/dim]")
+    console.print("   [dim]✓ Fast and reliable[/dim]")
+    console.print("   [dim]✓ Good for basic translation[/dim]")
+    console.print("   [red]Cons:[/red]")
+    console.print("   [dim]✗ Sometimes too literal/stiff[/dim]")
+    console.print("   [dim]✗ Not context-aware[/dim]")
     
     console.print("\n[bold green]2. DeepSeek AI (Recommended)[/bold green]")
-    console.print("   [green]Kelebihan:[/green]")
-    console.print("   [dim]✓ Lebih natural dan conversational[/dim]")
-    console.print("   [dim]✓ Context-aware (paham topik video)[/dim]")
-    console.print("   [dim]✓ Batch processing (10x lebih cepat)[/dim]")
-    console.print("   [dim]✓ Hasil terjemahan lebih enak dibaca[/dim]")
-    console.print("   [red]Kekurangan:[/red]")
-    console.print("   [dim]✗ Perlu API key (tapi sangat murah)[/dim]")
+    console.print("   [green]Pros:[/green]")
+    console.print("   [dim]✓ More natural and conversational[/dim]")
+    console.print("   [dim]✓ Context-aware (understands video topic)[/dim]")
+    console.print("   [dim]✓ Batch processing (10x faster)[/dim]")
+    console.print("   [dim]✓ Better translation quality[/dim]")
+    console.print("   [red]Cons:[/red]")
+    console.print("   [dim]✗ Requires API key (but very cheap)[/dim]")
     
     while True:
         console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1 or 2):[/white] ", end="")
@@ -283,6 +288,45 @@ def ask_deepseek():
             return True
         else:
             console.print("[yellow]Please enter 1 or 2[/yellow]")
+
+
+def ask_dubbing_option():
+    """Ask user if they want to add voice dubbing"""
+    from utils.ui import console
+    
+    console.print("\n[bold cyan]Voice Dubbing Option:[/bold cyan]")
+    
+    console.print("\n[bold yellow]1. No Dubbing (Default)[/bold yellow]")
+    console.print("   [dim]Only add subtitle, keep original audio[/dim]")
+    
+    console.print("\n[bold green]2. gTTS Dubbing (Fast)[/bold green]")
+    console.print("   [green]Pros:[/green]")
+    console.print("   [dim]✓ Free and unlimited[/dim]")
+    console.print("   [dim]✓ Very fast processing[/dim]")
+    console.print("   [dim]✓ Support many languages[/dim]")
+    console.print("   [red]Cons:[/red]")
+    console.print("   [dim]✗ Robotic voice, not natural[/dim]")
+    
+    console.print("\n[bold magenta]3. pyttsx3 TTS (Offline)[/bold magenta]")
+    console.print("   [green]Pros:[/green]")
+    console.print("   [dim]✓ Free and offline[/dim]")
+    console.print("   [dim]✓ No internet required[/dim]")
+    console.print("   [dim]✓ Uses system voices[/dim]")
+    console.print("   [red]Cons:[/red]")
+    console.print("   [dim]✗ Voice quality depends on system[/dim]")
+    console.print("   [dim]✗ Limited voice options[/dim]")
+    
+    while True:
+        console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1, 2, or 3):[/white] ", end="")
+        choice = input().strip()
+        if choice == "1":
+            return None  # No dubbing
+        elif choice == "2":
+            return 'gtts'
+        elif choice == "3":
+            return 'piper'
+        else:
+            console.print("[yellow]Please enter 1, 2, or 3[/yellow]")
 
 
 def ask_embedding_method():
@@ -297,19 +341,19 @@ def ask_embedding_method():
         console.print("\n[bold cyan]Choose Embedding Method:[/bold cyan]")
         
         console.print("\n[bold yellow]1. Standard Quality (Default)[/bold yellow]")
-        console.print("   [green]Kelebihan:[/green]")
-        console.print("   [dim]✓ Kualitas terbaik[/dim]")
-        console.print("   [dim]✓ Compatible dengan semua player[/dim]")
-        console.print("   [red]Kekurangan:[/red]")
-        console.print("   [dim]✗ Paling lambat (~12-13 menit untuk video 17 menit)[/dim]")
+        console.print("   [green]Pros:[/green]")
+        console.print("   [dim]✓ Best quality[/dim]")
+        console.print("   [dim]✓ Compatible with all players[/dim]")
+        console.print("   [red]Cons:[/red]")
+        console.print("   [dim]✗ Slowest (~12-13 min for 17 min video)[/dim]")
         
         console.print("\n[bold green]2. Fast Encoding (Recommended)[/bold green]")
-        console.print("   [green]Kelebihan:[/green]")
-        console.print("   [dim]✓ 2-3x lebih cepat (~4-6 menit untuk video 17 menit)[/dim]")
-        console.print("   [dim]✓ Kualitas masih bagus[/dim]")
-        console.print("   [dim]✓ File size sedikit lebih besar[/dim]")
-        console.print("   [red]Kekurangan:[/red]")
-        console.print("   [dim]✗ Kualitas sedikit turun (barely noticeable)[/dim]")
+        console.print("   [green]Pros:[/green]")
+        console.print("   [dim]✓ 2-3x faster (~4-6 min for 17 min video)[/dim]")
+        console.print("   [dim]✓ Still good quality[/dim]")
+        console.print("   [dim]✓ Slightly larger file size[/dim]")
+        console.print("   [red]Cons:[/red]")
+        console.print("   [dim]✗ Slightly lower quality (barely noticeable)[/dim]")
         
         # Show GPU option with availability status
         if gpu_available:
@@ -317,11 +361,11 @@ def ask_embedding_method():
         else:
             console.print("\n[bold magenta]3. GPU Accelerated (Fastest) ✗ Not Available[/bold magenta]")
         
-        console.print("   [green]Kelebihan:[/green]")
-        console.print("   [dim]✓ 3-5x lebih cepat (~2-3 menit untuk video 17 menit)[/dim]")
-        console.print("   [dim]✓ Kualitas hampir sama dengan standard[/dim]")
-        console.print("   [red]Kekurangan:[/red]")
-        console.print("   [dim]✗ Butuh NVIDIA GPU[/dim]")
+        console.print("   [green]Pros:[/green]")
+        console.print("   [dim]✓ 3-5x faster (~2-3 min for 17 min video)[/dim]")
+        console.print("   [dim]✓ Quality almost same as standard[/dim]")
+        console.print("   [red]Cons:[/red]")
+        console.print("   [dim]✗ Requires NVIDIA GPU[/dim]")
         
         console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1, 2, or 3):[/white] ", end="")
         choice = input().strip()
@@ -351,11 +395,11 @@ def ask_video_source():
     
     console.print("\n[bold cyan]Choose Video Source:[/bold cyan]")
     console.print("\n[bold yellow]1. Local File[/bold yellow]")
-    console.print("   [dim]Video file dari komputer lo[/dim]")
+    console.print("   [dim]Video file from your computer[/dim]")
     
     console.print("\n[bold green]2. YouTube URL[/bold green]")
-    console.print("   [dim]Download video dari YouTube[/dim]")
-    console.print("   [dim]Otomatis download kualitas terbaik[/dim]")
+    console.print("   [dim]Download video from YouTube[/dim]")
+    console.print("   [dim]Automatically downloads best quality[/dim]")
     
     while True:
         console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1 or 2):[/white] ", end="")
@@ -445,13 +489,20 @@ def main():
     translate_flag = True
     embed_flag = True
     
-    # Ask about Faster-Whisper if not set via command line
-    if faster_flag is None:
-        faster_flag = ask_faster_whisper()
+    # Get Whisper mode from environment variable (default: Faster-Whisper)
+    whisper_mode = os.getenv('WHISPER_MODE', '1')
+    faster_flag = True if whisper_mode == '1' else False
     
     # Ask about DeepSeek if not set via command line
     if deepseek_flag is None:
         deepseek_flag = ask_deepseek()
+    
+    # Ask about dubbing option (only if enabled in .env)
+    dubbing_enabled = os.getenv('ENABLE_DUBBING', 'false').lower() == 'true'
+    if dubbing_enabled:
+        dubbing_method = ask_dubbing_option()
+    else:
+        dubbing_method = None
     
     # Ask about embedding method
     embedding_method = ask_embedding_method()
@@ -463,6 +514,14 @@ def main():
     print_info("Transcriber", "Faster-Whisper" if faster_flag else "Regular Whisper")
     print_info("Translator", "DeepSeek AI" if deepseek_flag else "Google Translate")
     
+    # Show dubbing method
+    dubbing_names = {
+        'gtts': 'gTTS (Fast)',
+        'piper': 'pyttsx3 (Offline)',
+        None: 'No Dubbing'
+    }
+    print_info("Dubbing", dubbing_names.get(dubbing_method, "No Dubbing"))
+    
     # Show embedding method
     embedding_names = {
         'standard': 'Standard Quality',
@@ -470,7 +529,11 @@ def main():
         'gpu': 'GPU Accelerated'
     }
     print_info("Embedding", embedding_names.get(embedding_method, embedding_method))
-    print_info("Output", "Video with embedded subtitle")
+    
+    output_desc = "Video with subtitle"
+    if dubbing_method:
+        output_desc += " + dubbing"
+    print_info("Output", output_desc)
     
     try:
         output_video = generate_subtitle(
@@ -482,7 +545,8 @@ def main():
             use_deepseek=deepseek_flag,
             use_faster_whisper=faster_flag,
             embedding_method=embedding_method,
-            video_title=video_title if video_source == "youtube" else None
+            video_title=video_title if video_source == "youtube" else None,
+            dubbing_method=dubbing_method
         )
         
         # Clean up original YouTube video after successful generation

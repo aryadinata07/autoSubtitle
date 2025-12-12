@@ -1,149 +1,284 @@
 # Auto Subtitle Generator
 
-Generate subtitle otomatis dari video menggunakan Whisper AI.
+Automatically generate subtitles and voice dubbing for videos using Whisper AI.
 
-## Instalasi
+## ✨ Features
 
-1. Install dependencies:
+- 🎯 **Automatic Transcription** - Using OpenAI Whisper (Faster-Whisper by default)
+- 🌍 **Auto Translation** - English ↔ Indonesian with Google Translate or DeepSeek AI
+- 🎬 **Video Embedding** - Hardcode subtitles directly into video (3 encoding methods)
+- 🎤 **Voice Dubbing** - Generate AI voice dubbing (gTTS or Piper TTS)
+- 📺 **YouTube Support** - Download and process YouTube videos automatically
+- ⚡ **GPU Acceleration** - Support for NVIDIA GPU (CUDA) for faster processing
+- 🎨 **Customizable Styling** - Adjust subtitle appearance via .env configuration
+
+## 📋 Requirements
+
+- Python 3.8+
+- FFmpeg (for video/audio processing)
+- NVIDIA GPU with CUDA (optional, for GPU acceleration)
+
+## 🚀 Installation
+
+### 1. Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Install ffmpeg (diperlukan untuk moviepy):
-   - **Windows**: Download dari https://ffmpeg.org/download.html
-   - **Linux**: `sudo apt install ffmpeg`
-   - **Mac**: `brew install ffmpeg`
+### 2. Install FFmpeg
 
-## Cara Pakai
+- **Windows**: Download from https://ffmpeg.org/download.html
+- **Linux**: `sudo apt install ffmpeg`
+- **Mac**: `brew install ffmpeg`
 
-### Interactive Mode
+### 3. Setup Configuration (Optional)
+
+Copy `.env.example` to `.env` and configure:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` file:
+```env
+# DeepSeek API Key (for better translation quality)
+DEEPSEEK_API_KEY=your_api_key_here
+
+# Whisper Mode (1=Faster-Whisper, 2=Regular Whisper)
+WHISPER_MODE=1
+
+# Subtitle Styling (minimal, standard, bold)
+SUBTITLE_PRESET=minimal
+
+# Subtitle Position (bottom, top, center)
+SUBTITLE_POSITION=bottom
+```
+
+Get DeepSeek API key from: https://platform.deepseek.com/
+
+## 📖 Usage
+
+### Interactive Mode (Recommended)
+
 ```bash
 python generate_subtitle.py
 ```
-Script akan menanyakan:
-1. **Video source**: Local file atau YouTube URL
-2. **File path/URL**: Tergantung pilihan di step 1
-3. **Transcription method**: Regular Whisper atau Faster-Whisper
-4. **Translation method**: Google Translate atau DeepSeek AI
-5. **Embedding method**: Standard, Fast, atau GPU
+
+The script will guide you through:
+1. **Video Source** - Local file or YouTube URL
+2. **Translation Method** - Google Translate (free) or DeepSeek AI (better quality)
+3. **Dubbing Option** - No dubbing, gTTS (fast), or Piper TTS (natural)
+4. **Embedding Method** - Standard quality, Fast encoding, or GPU accelerated
 
 ### Command Line Mode
 
-**YouTube URL:**
+**Process YouTube Video:**
 ```bash
 python generate_subtitle.py -url "https://youtube.com/watch?v=..."
 ```
 
-**Local File:**
+**Process Local File:**
 ```bash
-python generate_subtitle.py -l "C:\path\to\video.mp4"
+python generate_subtitle.py -l "path/to/video.mp4"
 ```
 
-**Dengan Options:**
+**With Options:**
 ```bash
-# YouTube dengan Faster-Whisper dan DeepSeek
-python generate_subtitle.py -url "https://youtube.com/..." --faster --deepseek
+# YouTube with DeepSeek AI translation
+python generate_subtitle.py -url "https://youtube.com/..." --deepseek
 
-# Local file dengan model small
+# Local file with specific model
 python generate_subtitle.py -l "video.mp4" --model small
 
-# Local file dengan bahasa spesifik
+# Local file with specific language
 python generate_subtitle.py -l "video.mp4" --lang id
 ```
 
 **Available Options:**
-- `-url <url>` atau `--url <url>` - YouTube URL
-- `-l <path>` atau `--local <path>` - Local video file path
-- `--model <size>` - Model size: tiny, base, small, medium, large
-- `--lang <code>` - Language: id, en, atau auto-detect
-- `--faster` - Use Faster-Whisper
-- `--deepseek` - Use DeepSeek AI for translation
-
-Output: `video_with_subtitle.mp4` (video dengan subtitle ter-embed)
-
-- Jika video bahasa **English** → auto translate ke **Indonesian**
-- Jika video bahasa **Indonesian** → auto translate ke **English**
-- File SRT tidak disimpan, langsung embed ke video
-- YouTube video otomatis download kualitas terbaik
-
-### Translate dengan DeepSeek AI (Lebih Akurat)
-```bash
-python generate_subtitle.py video.mp4 --deepseek
-```
-DeepSeek AI memberikan hasil terjemahan yang lebih natural dan akurat dibanding Google Translate.
-
-**Setup DeepSeek:**
-1. Copy `.env.example` ke `.env`
-2. Isi `DEEPSEEK_API_KEY` dengan API key kamu
-3. Get API key dari: https://platform.deepseek.com/
-
-### Dengan Model Tertentu
-```bash
-python generate_subtitle.py video.mp4 --model small
-```
-
-### Dengan Bahasa Spesifik
-```bash
-python generate_subtitle.py video.mp4 --lang id
-```
-
-### Options
+- `-url <url>` or `--url <url>` - YouTube URL
+- `-l <path>` or `--local <path>` - Local video file path
 - `--model <size>` - Model size: tiny, base, small, medium, large (default: base)
-- `--lang <code>` - Language: id, en, atau auto-detect (default: auto)
+- `--lang <code>` - Language code: id, en, or auto-detect (default: auto)
 - `--deepseek` - Use DeepSeek AI for translation (more accurate)
 
-## Model Size
+## 🎯 Features Explained
 
-- **tiny**: Paling cepat, akurasi rendah
-- **base**: Balance antara speed dan akurasi (default)
-- **small**: Akurasi lebih baik
-- **medium**: Akurasi tinggi
-- **large**: Akurasi terbaik, paling lambat
+### 1. Transcription Methods
 
-## Language Codes
+**Faster-Whisper (Default)**
+- ✅ 4-5x faster than regular Whisper
+- ✅ 50% less memory usage
+- ✅ Same accuracy as regular Whisper
+- ✅ GPU acceleration support
 
-- `id` - Bahasa Indonesia
+**Regular Whisper**
+- ✅ Standard OpenAI implementation
+- ✅ Reliable and well-tested
+- ⚠️ Slower processing
+
+Configure in `.env`: `WHISPER_MODE=1` (Faster) or `WHISPER_MODE=2` (Regular)
+
+### 2. Translation Methods
+
+**Google Translate (Free)**
+- ✅ Free, no API key required
+- ✅ Fast and reliable
+- ⚠️ Sometimes too literal
+
+**DeepSeek AI (Recommended)**
+- ✅ More natural and conversational
+- ✅ Context-aware (understands video topic)
+- ✅ Batch processing (10x faster)
+- ⚠️ Requires API key (very cheap)
+
+### 3. Voice Dubbing (BETA - Experimental)
+
+> ⚠️ **WARNING**: This feature is experimental and disabled by default. Enable in `.env` by setting `ENABLE_DUBBING=true`
+
+**Known Issues:**
+- Audio timing may not sync perfectly with video
+- Voice quality varies depending on TTS engine
+- Significantly increases processing time
+- May require additional troubleshooting
+
+**No Dubbing (Default)**
+- Only adds subtitle, keeps original audio
+
+**gTTS (Fast)**
+- ✅ Free and unlimited
+- ✅ Very fast processing
+- ⚠️ Robotic voice
+- ⚠️ May have timing issues
+
+**pyttsx3 TTS (Offline)**
+- ✅ Free and offline
+- ✅ No internet required
+- ✅ Uses system voices
+- ⚠️ Voice quality depends on system
+- ⚠️ Limited voice options
+- ⚠️ May have timing issues
+
+### 4. Video Embedding Methods
+
+**Standard Quality**
+- ✅ Best quality
+- ✅ Compatible with all players
+- ⚠️ Slowest (~12-13 min for 17 min video)
+
+**Fast Encoding (Recommended)**
+- ✅ 2-3x faster (~4-6 min for 17 min video)
+- ✅ Still good quality
+- ⚠️ Slightly lower quality (barely noticeable)
+
+**GPU Accelerated**
+- ✅ 3-5x faster (~2-3 min for 17 min video)
+- ✅ Quality almost same as standard
+- ⚠️ Requires NVIDIA GPU with CUDA
+
+### 5. Subtitle Styling
+
+Configure in `.env`:
+
+**Presets:**
+- `minimal` - Small font, thin outline, doesn't distract from video (Recommended)
+- `standard` - Balanced, readable but not too dominant
+- `bold` - Large font, thick outline, for better readability
+
+**Position:**
+- `bottom` - Bottom position (default)
+- `top` - Top position
+- `center` - Center position (not recommended)
+
+**Custom Styling:**
+```env
+SUBTITLE_FONT_SIZE=14
+SUBTITLE_OUTLINE=1
+SUBTITLE_MARGIN=10
+```
+
+## 📊 Model Sizes
+
+| Model | Speed | Accuracy | RAM Usage |
+|-------|-------|----------|-----------|
+| tiny | ⚡⚡⚡⚡⚡ | ⭐⭐ | ~1 GB |
+| base | ⚡⚡⚡⚡ | ⭐⭐⭐ | ~1.5 GB |
+| small | ⚡⚡⚡ | ⭐⭐⭐⭐ | ~2.5 GB |
+| medium | ⚡⚡ | ⭐⭐⭐⭐⭐ | ~5 GB |
+| large | ⚡ | ⭐⭐⭐⭐⭐ | ~10 GB |
+
+## 🌍 Language Codes
+
+- `id` - Indonesian
 - `en` - English
-- Kosongkan untuk auto-detect
+- Leave empty for auto-detect
 
-## Output
+## 📁 Output
 
-File subtitle (.srt) akan dibuat dengan nama yang sama dengan video.
+The script generates:
+- `video_with_subtitle.mp4` - Video with embedded subtitle
+- `video_dubbed.mp4` - Video with dubbing (if dubbing option selected)
 
-Contoh:
-- Input: `video.mp4`
-- Output: `video.srt`
+Translation direction:
+- English video → Indonesian subtitle/dubbing
+- Indonesian video → English subtitle/dubbing
 
-## Output
-
-Script akan menghasilkan:
-- `video_with_subtitle.mp4` - Video dengan subtitle ter-embed (hardcoded)
-- File SRT tidak disimpan (langsung embed ke video)
-
-## Struktur Project
+## 🏗️ Project Structure
 
 ```
-vidio-subtitle/
+autoSubtitle/
 ├── generate_subtitle.py       # Main script
 ├── utils/
 │   ├── __init__.py            # Package initialization
 │   ├── audio_extractor.py     # Extract audio from video
-│   ├── transcriber.py         # Whisper transcription
-│   ├── subtitle_creator.py    # Create SRT files
+│   ├── transcriber.py         # Whisper transcription interface
+│   ├── transcriber_faster.py  # Faster-Whisper implementation
+│   ├── transcriber_whisper.py # Regular Whisper implementation
+│   ├── subtitle_creator.py    # Create SRT files with styling
 │   ├── translator.py          # Translation interface
 │   ├── translator_google.py   # Google Translate implementation
 │   ├── translator_deepseek.py # DeepSeek AI implementation
 │   ├── video_embedder.py      # Embed subtitle to video
+│   ├── dubbing.py             # Voice dubbing (gTTS, Piper TTS)
+│   ├── youtube_downloader.py  # YouTube video downloader
 │   └── ui.py                  # Terminal UI utilities
-├── .env                       # API keys configuration
+├── .env                       # Configuration (API keys, settings)
 ├── .env.example               # Example configuration
-├── requirements.txt
-└── README.md
+├── requirements.txt           # Python dependencies
+└── README.md                  # This file
 ```
 
-## Tips
+## 💡 Tips
 
-- Untuk video pendek (< 5 menit): gunakan model `base` atau `small`
-- Untuk video panjang: gunakan model `tiny` atau `base` untuk lebih cepat
-- Untuk akurasi maksimal: gunakan model `large` (butuh RAM besar)
-- Translation pakai Google Translate API (gratis)
+**For Best Results:**
+- Use `base` or `small` model for short videos (< 5 min)
+- Use `tiny` or `base` model for long videos (faster processing)
+- Use `large` model for maximum accuracy (requires more RAM)
+- Use DeepSeek AI for better translation quality
+- Use Piper TTS for more natural dubbing voice
+- Use GPU acceleration if you have NVIDIA GPU
+- Use `minimal` subtitle preset to avoid distracting from video
+
+**Performance:**
+- Faster-Whisper is 4-5x faster than Regular Whisper
+- GPU acceleration is 3-5x faster than CPU for video encoding
+- DeepSeek batch processing is 10x faster than Google Translate
+- Fast encoding is 2-3x faster than standard quality
+
+**Troubleshooting:**
+- If cuDNN error occurs, the script will automatically fallback to CPU mode
+- If GPU not detected, GPU acceleration option will be disabled
+- If Piper TTS not installed, use gTTS instead
+- Make sure FFmpeg is in PATH for video processing
+
+## 📝 License
+
+MIT License
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 🐛 Issues
+
+If you encounter any issues, please report them on the GitHub Issues page.
