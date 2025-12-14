@@ -40,7 +40,16 @@ def get_output_directory():
     Returns:
         Path: Output directory path
     """
-    current_dir = Path.cwd()
+    # Check if running via autosub.bat (has AUTOSUB_USER_DIR env var)
+    user_dir_env = os.getenv('AUTOSUB_USER_DIR')
+    
+    if user_dir_env:
+        # Running via autosub.bat - use user's original directory
+        current_dir = Path(user_dir_env)
+    else:
+        # Running directly - use current working directory
+        current_dir = Path.cwd()
+    
     script_dir = SCRIPT_DIR
     
     # If running from script directory, use 'downloads' folder
@@ -265,6 +274,8 @@ def parse_arguments():
     turbo_flag = None  # None means ask user
     video_source = None  # None means ask user
     video_input = None  # URL or file path
+    use_defaults = False  # Flag for using default settings
+    preset_mode = None  # Preset mode
     
     i = 1
     while i < len(sys.argv):
@@ -284,6 +295,21 @@ def parse_arguments():
         elif arg == "--turbo":
             turbo_flag = True
             i += 1
+        elif arg in ["-default", "--default"]:
+            preset_mode = "default"
+            i += 1
+        elif arg in ["-fast", "--fast"]:
+            preset_mode = "fast"
+            i += 1
+        elif arg in ["-quality", "--quality"]:
+            preset_mode = "quality"
+            i += 1
+        elif arg in ["-speed", "--speed"]:
+            preset_mode = "speed"
+            i += 1
+        elif arg in ["-budget", "--budget"]:
+            preset_mode = "budget"
+            i += 1
         elif arg in ["-url", "--url"] and i + 1 < len(sys.argv):
             video_source = "youtube"
             video_input = sys.argv[i + 1]
@@ -295,7 +321,7 @@ def parse_arguments():
         else:
             i += 1
     
-    return model, lang, deepseek_flag, faster_flag, turbo_flag, video_source, video_input
+    return model, lang, deepseek_flag, faster_flag, turbo_flag, video_source, video_input, preset_mode
 
 
 
@@ -341,16 +367,7 @@ def ask_deepseek():
     
     console.print("\n[bold cyan]Choose Translation Method:[/bold cyan]")
     
-    console.print("\n[bold yellow]1. Google Translate (Default - Free)[/bold yellow]")
-    console.print("   [green]Pros:[/green]")
-    console.print("   [dim]✓ Free, no API key required[/dim]")
-    console.print("   [dim]✓ Fast and reliable[/dim]")
-    console.print("   [dim]✓ Good for basic translation[/dim]")
-    console.print("   [red]Cons:[/red]")
-    console.print("   [dim]✗ Sometimes too literal/stiff[/dim]")
-    console.print("   [dim]✗ Not context-aware[/dim]")
-    
-    console.print("\n[bold green]2. DeepSeek AI (Recommended)[/bold green]")
+    console.print("\n[bold green]1. DeepSeek AI (Default - Recommended)[/bold green]")
     console.print("   [green]Pros:[/green]")
     console.print("   [dim]✓ More natural and conversational[/dim]")
     console.print("   [dim]✓ Context-aware (understands video topic)[/dim]")
@@ -359,15 +376,24 @@ def ask_deepseek():
     console.print("   [red]Cons:[/red]")
     console.print("   [dim]✗ Requires API key (but very cheap)[/dim]")
     
+    console.print("\n[bold yellow]2. Google Translate (Free Fallback)[/bold yellow]")
+    console.print("   [green]Pros:[/green]")
+    console.print("   [dim]✓ Free, no API key required[/dim]")
+    console.print("   [dim]✓ Fast and reliable[/dim]")
+    console.print("   [dim]✓ Good for basic translation[/dim]")
+    console.print("   [red]Cons:[/red]")
+    console.print("   [dim]✗ Sometimes too literal/stiff[/dim]")
+    console.print("   [dim]✗ Not context-aware[/dim]")
+    
     while True:
-        console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1 or 2):[/white] ", end="")
+        console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1 or 2, default=1):[/white] ", end="")
         choice = input().strip()
-        if choice == "1":
-            return False
-        elif choice == "2":
+        if choice == "" or choice == "1":
             return True
+        elif choice == "2":
+            return False
         else:
-            console.print("[yellow]Please enter 1 or 2[/yellow]")
+            console.print("[yellow]Please enter 1 or 2 (or press Enter for default)[/yellow]")
 
 
 def ask_embedding_method():
@@ -381,14 +407,14 @@ def ask_embedding_method():
     while True:
         console.print("\n[bold cyan]Choose Embedding Method:[/bold cyan]")
         
-        console.print("\n[bold yellow]1. Standard Quality (Default)[/bold yellow]")
+        console.print("\n[bold yellow]1. Standard Quality[/bold yellow]")
         console.print("   [green]Pros:[/green]")
         console.print("   [dim]✓ Best quality[/dim]")
         console.print("   [dim]✓ Compatible with all players[/dim]")
         console.print("   [red]Cons:[/red]")
         console.print("   [dim]✗ Slowest (~12-13 min for 17 min video)[/dim]")
         
-        console.print("\n[bold green]2. Fast Encoding (Recommended)[/bold green]")
+        console.print("\n[bold green]2. Fast Encoding (Default - Recommended)[/bold green]")
         console.print("   [green]Pros:[/green]")
         console.print("   [dim]✓ 2-3x faster (~4-6 min for 17 min video)[/dim]")
         console.print("   [dim]✓ Still good quality[/dim]")
@@ -408,12 +434,12 @@ def ask_embedding_method():
         console.print("   [red]Cons:[/red]")
         console.print("   [dim]✗ Requires NVIDIA GPU[/dim]")
         
-        console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1, 2, or 3):[/white] ", end="")
+        console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1, 2, or 3, default=2):[/white] ", end="")
         choice = input().strip()
         
         if choice == "1":
             return 'standard'
-        elif choice == "2":
+        elif choice == "" or choice == "2":
             return 'fast'
         elif choice == "3":
             # Validate GPU availability
@@ -427,7 +453,7 @@ def ask_embedding_method():
                 continue
             return 'gpu'
         else:
-            console.print("[yellow]Please enter 1, 2, or 3[/yellow]")
+            console.print("[yellow]Please enter 1, 2, or 3 (or press Enter for default)[/yellow]")
 
 
 def ask_video_source():
@@ -491,7 +517,7 @@ def get_local_file():
 
 def main():
     """Main entry point"""
-    model, lang, deepseek_flag, faster_flag, turbo_flag, video_source, video_input = parse_arguments()
+    model, lang, deepseek_flag, faster_flag, turbo_flag, video_source, video_input, preset_mode = parse_arguments()
     
     # If video source not provided via command line, ask user
     if video_source is None:
@@ -538,25 +564,72 @@ def main():
     whisper_mode = os.getenv('WHISPER_MODE', '1')
     faster_flag = True if whisper_mode == '1' else False
     
-    # Get Turbo mode from environment variable if not set via command line
-    if turbo_flag is None:
-        turbo_env = os.getenv('TURBO_MODE', 'ask')
-        if turbo_env.lower() == 'true':
-            turbo_flag = True
-        elif turbo_env.lower() == 'false':
-            turbo_flag = False
-        else:
-            # Ask user
-            turbo_flag = ask_turbo_mode()
+    # Check if using preset mode
+    if preset_mode:
+        if preset_mode == "default":
+            # Balanced: Standard + DeepSeek + Fast Encoding
+            if turbo_flag is None:
+                turbo_flag = False
+            if deepseek_flag is None:
+                deepseek_flag = True
+            embedding_method = 'fast'
+            print_info("Preset", "Default (Balanced: Standard + DeepSeek + Fast)")
+        
+        elif preset_mode == "fast":
+            # Fast: Turbo + DeepSeek + Fast Encoding
+            if turbo_flag is None:
+                turbo_flag = True
+            if deepseek_flag is None:
+                deepseek_flag = True
+            embedding_method = 'fast'
+            print_info("Preset", "Fast (Turbo + DeepSeek + Fast Encoding)")
+        
+        elif preset_mode == "quality":
+            # Quality: Standard + DeepSeek + Standard Encoding
+            if turbo_flag is None:
+                turbo_flag = False
+            if deepseek_flag is None:
+                deepseek_flag = True
+            embedding_method = 'standard'
+            print_info("Preset", "Quality (Standard + DeepSeek + Standard Encoding)")
+        
+        elif preset_mode == "speed":
+            # Maximum Speed: Turbo + Google + Fast Encoding
+            if turbo_flag is None:
+                turbo_flag = True
+            if deepseek_flag is None:
+                deepseek_flag = False
+            embedding_method = 'fast'
+            print_info("Preset", "Speed (Turbo + Google Translate + Fast Encoding)")
+        
+        elif preset_mode == "budget":
+            # Budget: Standard + Google + Fast Encoding (no API key needed)
+            if turbo_flag is None:
+                turbo_flag = False
+            if deepseek_flag is None:
+                deepseek_flag = False
+            embedding_method = 'fast'
+            print_info("Preset", "Budget (Standard + Google Translate + Fast Encoding)")
     
-    # Ask about DeepSeek if not set via command line
-    if deepseek_flag is None:
-        deepseek_flag = ask_deepseek()
-    
-
-    
-    # Ask about embedding method
-    embedding_method = ask_embedding_method()
+    else:
+        # Interactive mode - ask user for each option
+        # Get Turbo mode from environment variable if not set via command line
+        if turbo_flag is None:
+            turbo_env = os.getenv('TURBO_MODE', 'ask')
+            if turbo_env.lower() == 'true':
+                turbo_flag = True
+            elif turbo_env.lower() == 'false':
+                turbo_flag = False
+            else:
+                # Ask user
+                turbo_flag = ask_turbo_mode()
+        
+        # Ask about DeepSeek if not set via command line
+        if deepseek_flag is None:
+            deepseek_flag = ask_deepseek()
+        
+        # Ask about embedding method
+        embedding_method = ask_embedding_method()
     
     print_header("AUTO SUBTITLE GENERATOR")
     print_info("Video", video_file)

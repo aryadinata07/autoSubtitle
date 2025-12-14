@@ -61,25 +61,6 @@ SUBTITLE_POSITION=bottom
 
 Get DeepSeek API key from: https://platform.deepseek.com/
 
-### 4. Global Installation (Optional)
-
-Want to run `autosub` from anywhere? See [INSTALL.md](INSTALL.md) for:
-- ✅ Batch script method (Windows - Simplest)
-- ✅ Python package installation (Cross-platform)
-- ✅ PowerShell alias (Windows)
-- ✅ Symlink method (Advanced)
-
-Quick setup:
-```bash
-# Method 1: Add project folder to PATH (Windows)
-# Then run from anywhere:
-autosub -url "https://youtube.com/..."
-
-# Method 2: Install as Python package
-pip install -e .
-autosub -l "video.mp4" --turbo
-```
-
 ## 📖 Usage
 
 ### Interactive Mode (Recommended)
@@ -88,11 +69,29 @@ autosub -l "video.mp4" --turbo
 python generate_subtitle.py
 ```
 
-The script will guide you through:
+**Interactive Mode** - The script will guide you through:
 1. **Video Source** - Local file or YouTube URL
 2. **Transcription Mode** - Standard (accurate) or Turbo (3-6x faster)
-3. **Translation Method** - Google Translate (free) or DeepSeek AI (better quality)
-4. **Embedding Method** - Standard quality, Fast encoding, or GPU accelerated
+3. **Translation Method** - DeepSeek AI (default, better quality) or Google Translate (free fallback)
+4. **Embedding Method** - Fast encoding (default), Standard quality, or GPU accelerated
+
+**Preset Modes** - Skip all prompts, use pre-configured settings:
+```bash
+# Fast mode (recommended for most users)
+autosub -url "https://youtube.com/..." -fast
+
+# Default mode (balanced quality/speed)
+autosub -url "https://youtube.com/..." -default
+
+# Quality mode (maximum accuracy)
+autosub -url "https://youtube.com/..." -quality
+
+# Speed mode (maximum speed, no API key)
+autosub -url "https://youtube.com/..." -speed
+
+# Budget mode (free, no API key)
+autosub -url "https://youtube.com/..." -budget
+```
 
 ### Command Line Mode
 
@@ -106,31 +105,57 @@ python generate_subtitle.py -url "https://youtube.com/watch?v=..."
 python generate_subtitle.py -l "path/to/video.mp4"
 ```
 
-**With Options:**
+**With Preset Modes:**
 ```bash
-# YouTube with DeepSeek AI translation
-python generate_subtitle.py -url "https://youtube.com/..." --deepseek
+# Fast mode (recommended for most users)
+python generate_subtitle.py -url "https://youtube.com/..." -fast
 
-# Local file with turbo mode (3-6x faster)
-python generate_subtitle.py -l "video.mp4" --turbo
+# Default mode (balanced)
+python generate_subtitle.py -l "video.mp4" -default
 
-# Local file with distil model (6x faster)
-python generate_subtitle.py -l "video.mp4" --model distil-large
+# Quality mode (maximum accuracy)
+python generate_subtitle.py -l "video.mp4" -quality
 
-# Maximum speed: Turbo + Distil (up to 18x faster!)
-python generate_subtitle.py -l "video.mp4" --model distil-large --turbo
+# Speed mode (maximum speed, no API key)
+python generate_subtitle.py -l "video.mp4" -speed
 
-# Local file with specific language
-python generate_subtitle.py -l "video.mp4" --lang id
+# Budget mode (free, no API key)
+python generate_subtitle.py -l "video.mp4" -budget
+```
+
+**With Custom Options:**
+```bash
+# Fast mode + Distil model (18x faster!)
+python generate_subtitle.py -l "video.mp4" --model distil-large -fast
+
+# Quality mode + Large model
+python generate_subtitle.py -l "video.mp4" --model large -quality
+
+# Speed mode + Specific language
+python generate_subtitle.py -l "video.mp4" --lang id -speed
+
+# Interactive mode (choose all options manually)
+python generate_subtitle.py -l "video.mp4"
 ```
 
 **Available Options:**
+
+**Preset Modes (No Prompts):**
+- `-default` - Balanced (Standard + DeepSeek + Fast Encoding)
+- `-fast` - Fast mode (Turbo + DeepSeek + Fast Encoding) ⚡ Recommended
+- `-quality` - Quality mode (Standard + DeepSeek + Standard Encoding)
+- `-speed` - Speed mode (Turbo + Google + Fast Encoding)
+- `-budget` - Budget mode (Standard + Google + Fast Encoding) 💰 No API key
+
+**Video Source:**
 - `-url <url>` or `--url <url>` - YouTube URL
 - `-l <path>` or `--local <path>` - Local video file path
+
+**Customization:**
 - `--model <size>` - Model size: tiny, base, small, medium, large, distil-small, distil-medium, distil-large (default: base)
 - `--lang <code>` - Language code: id, en, or auto-detect (default: auto)
-- `--turbo` - Enable turbo mode (3-6x faster transcription)
-- `--deepseek` - Use DeepSeek AI for translation (more accurate)
+- `--turbo` - Force turbo mode (can override preset)
+- `--deepseek` - Force DeepSeek AI (can override preset)
 
 ## 🎯 Features Explained
 
@@ -162,28 +187,32 @@ Configure in `.env`: `TURBO_MODE=true` (always on), `false` (always off), or `as
 
 ### 2. Translation Methods
 
-**Google Translate (Free)**
-- ✅ Free, no API key required
-- ✅ Fast and reliable
-- ⚠️ Sometimes too literal
-
-**DeepSeek AI (Recommended)**
+**DeepSeek AI (Default - Recommended)**
 - ✅ More natural and conversational
 - ✅ Context-aware (understands video topic)
 - ✅ Batch processing (10x faster)
-- ⚠️ Requires API key (very cheap)
+- ✅ Better translation quality
+- ⚠️ Requires API key (very cheap - ~$0.14 per 1M tokens)
+
+**Google Translate (Free Fallback)**
+- ✅ Free, no API key required
+- ✅ Fast and reliable
+- ✅ Good for basic translation
+- ⚠️ Sometimes too literal/stiff
+- ⚠️ Not context-aware
 
 ### 3. Video Embedding Methods
+
+**Fast Encoding (Default - Recommended)**
+- ✅ 2-3x faster (~4-6 min for 17 min video)
+- ✅ Still good quality
+- ✅ Best balance of speed and quality
+- ⚠️ Slightly lower quality (barely noticeable)
 
 **Standard Quality**
 - ✅ Best quality
 - ✅ Compatible with all players
 - ⚠️ Slowest (~12-13 min for 17 min video)
-
-**Fast Encoding (Recommended)**
-- ✅ 2-3x faster (~4-6 min for 17 min video)
-- ✅ Still good quality
-- ⚠️ Slightly lower quality (barely noticeable)
 
 **GPU Accelerated**
 - ✅ 3-5x faster (~2-3 min for 17 min video)
@@ -292,6 +321,114 @@ autoSubtitle/
 └── README.md                  # This file
 ```
 
+## 🚀 Quick Reference - Preset Modes
+
+### 1. Default Mode (Balanced) ⚖️
+```bash
+autosub -url "https://youtube.com/..." -default
+```
+**Configuration:**
+- 🎯 Standard Mode (beam search, maximum accuracy)
+- 🤖 DeepSeek AI (better translation)
+- ⚡ Fast Encoding (2-3x faster)
+- ✅ Best for: General use, balanced quality/speed
+
+### 2. Fast Mode (Recommended for Most Users) 🚀
+```bash
+autosub -url "https://youtube.com/..." -fast
+```
+**Configuration:**
+- ⚡ Turbo Mode (greedy search, 3-6x faster)
+- 🤖 DeepSeek AI (better translation)
+- ⚡ Fast Encoding (2-3x faster)
+- ✅ Best for: YouTube videos, podcasts, clear audio
+
+### 3. Quality Mode (Maximum Accuracy) 💎
+```bash
+autosub -url "https://youtube.com/..." -quality
+```
+**Configuration:**
+- 🎯 Standard Mode (beam search, maximum accuracy)
+- 🤖 DeepSeek AI (better translation)
+- 🎬 Standard Encoding (best quality)
+- ✅ Best for: Professional work, important content
+
+### 4. Speed Mode (Maximum Speed) ⚡⚡⚡
+```bash
+autosub -url "https://youtube.com/..." -speed
+```
+**Configuration:**
+- ⚡ Turbo Mode (greedy search, 3-6x faster)
+- 🌐 Google Translate (free, no API key)
+- ⚡ Fast Encoding (2-3x faster)
+- ✅ Best for: Quick tests, batch processing
+
+### 5. Budget Mode (Free, No API Key) 💰
+```bash
+autosub -url "https://youtube.com/..." -budget
+```
+**Configuration:**
+- 🎯 Standard Mode (beam search, maximum accuracy)
+- 🌐 Google Translate (free, no API key)
+- ⚡ Fast Encoding (2-3x faster)
+- ✅ Best for: No DeepSeek API key, free usage
+
+### Comparison Table
+
+| Preset | Transcription | Translation | Encoding | Speed | Quality | API Key |
+|--------|--------------|-------------|----------|-------|---------|---------|
+| **-default** | Standard | DeepSeek | Fast | ⚡⚡ | ⭐⭐⭐⭐ | Required |
+| **-fast** | Turbo | DeepSeek | Fast | ⚡⚡⚡⚡ | ⭐⭐⭐⭐ | Required |
+| **-quality** | Standard | DeepSeek | Standard | ⚡ | ⭐⭐⭐⭐⭐ | Required |
+| **-speed** | Turbo | Google | Fast | ⚡⚡⚡⚡⚡ | ⭐⭐⭐ | Not Required |
+| **-budget** | Standard | Google | Fast | ⚡⚡ | ⭐⭐⭐ | Not Required |
+
+### Advanced Combinations
+```bash
+# Fast mode + Distil model (18x faster!)
+autosub -l "video.mp4" --model distil-large -fast
+
+# Quality mode + Large model (maximum accuracy)
+autosub -l "video.mp4" --model large -quality
+
+# Speed mode + Distil model (ultimate speed)
+autosub -l "video.mp4" --model distil-medium -speed
+
+# Budget mode + Specific language
+autosub -l "video.mp4" --lang id -budget
+```
+
+---
+
+## 📋 Cheat Sheet
+
+```bash
+# Quick commands for common scenarios
+
+# YouTube video (fast, recommended)
+autosub -url "https://youtube.com/..." -fast
+
+# Local video (balanced)
+autosub -l "video.mp4" -default
+
+# Professional work (maximum quality)
+autosub -l "video.mp4" --model large -quality
+
+# No API key (free)
+autosub -l "video.mp4" -budget
+
+# Maximum speed (18x faster!)
+autosub -l "video.mp4" --model distil-large -speed
+
+# Specific language
+autosub -l "video.mp4" --lang id -fast
+
+# Interactive mode (full control)
+autosub -l "video.mp4"
+```
+
+---
+
 ## 💡 Tips
 
 **For Best Results:**
@@ -334,6 +471,38 @@ MIT License
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📥 YouTube Download
+
+### Automatic Download with yt-dlp
+
+The script attempts to download YouTube videos automatically using yt-dlp.
+
+**Note:** YouTube actively blocks automated downloaders. Success rate varies.
+
+### ⚠️ If Download Fails
+
+**Recommended: Manual Download** (Most Reliable)
+
+1. **Download video manually:**
+   - **y2mate.com** (recommended)
+   - **savefrom.net**
+   - **ssyoutube.com** (add "ss" before youtube.com in URL)
+   - Browser extension: Video DownloadHelper
+
+2. **Process with autosub:**
+   ```bash
+   autosub -l "downloaded_video.mp4" -default
+   ```
+
+### 💡 Pro Tip
+
+For best results and reliability, **download videos manually first**, then process with autosub. This avoids YouTube's bot detection and is faster overall.
+
+### 💡 Pro Tip
+The fallback system usually works! Just run the command and let it try all methods automatically.
+
+---
 
 ## 🐛 Issues
 

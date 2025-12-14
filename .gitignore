@@ -43,6 +43,10 @@ downloads/*.mp4
 downloads/*.mkv
 downloads/*.avi
 downloads/*.webm
+videos/*.mp4
+videos/*.mkv
+videos/*.avi
+videos/*.webm
 *.mp4
 *.mkv
 *.avi
@@ -50,3 +54,4 @@ downloads/*.webm
 temp_audio.wav
 temp-audio.m4a
 *_temp.srt
+temp_subtitle_*.srt

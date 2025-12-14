@@ -87,6 +87,12 @@ def download_youtube_video(url, output_path="downloads"):
             
     except Exception as e:
         print_error(f"Failed to download video: {str(e)}")
+        print_substep("\n[SOLUTION] YouTube download failed. Please:")
+        print_substep("1. Download video manually from:")
+        print_substep("   - y2mate.com (recommended)")
+        print_substep("   - savefrom.net")
+        print_substep("   - ssyoutube.com (add 'ss' before youtube.com)")
+        print_substep("2. Then process with: autosub -l 'video.mp4' -default")
         raise
 
 
