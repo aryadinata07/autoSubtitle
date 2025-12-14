@@ -48,6 +48,9 @@ DEEPSEEK_API_KEY=your_api_key_here
 # Whisper Mode (1=Faster-Whisper, 2=Regular Whisper)
 WHISPER_MODE=1
 
+# Turbo Mode (true=always on, false=always off, ask=ask every time)
+TURBO_MODE=ask
+
 # Subtitle Styling (auto, minimal, standard, bold, reels, reels-bold)
 # 'auto' will automatically detect video orientation and choose the best preset
 SUBTITLE_PRESET=auto
@@ -57,6 +60,25 @@ SUBTITLE_POSITION=bottom
 ```
 
 Get DeepSeek API key from: https://platform.deepseek.com/
+
+### 4. Global Installation (Optional)
+
+Want to run `autosub` from anywhere? See [INSTALL.md](INSTALL.md) for:
+- ✅ Batch script method (Windows - Simplest)
+- ✅ Python package installation (Cross-platform)
+- ✅ PowerShell alias (Windows)
+- ✅ Symlink method (Advanced)
+
+Quick setup:
+```bash
+# Method 1: Add project folder to PATH (Windows)
+# Then run from anywhere:
+autosub -url "https://youtube.com/..."
+
+# Method 2: Install as Python package
+pip install -e .
+autosub -l "video.mp4" --turbo
+```
 
 ## 📖 Usage
 
