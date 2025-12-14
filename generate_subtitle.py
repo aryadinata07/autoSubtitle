@@ -2,10 +2,15 @@
 import os
 import sys
 import pysrt
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Get script directory (where generate_subtitle.py is located)
+SCRIPT_DIR = Path(__file__).parent.absolute()
+
+# Load environment variables from script directory
+env_path = SCRIPT_DIR / '.env'
+load_dotenv(dotenv_path=env_path)
 
 # Disable huggingface symlinks warning on Windows
 os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
@@ -28,6 +33,29 @@ from utils.ui import (
 )
 
 
+def get_output_directory():
+    """
+    Get output directory based on where script is run from
+    
+    Returns:
+        Path: Output directory path
+    """
+    current_dir = Path.cwd()
+    script_dir = SCRIPT_DIR
+    
+    # If running from script directory, use 'downloads' folder
+    if current_dir == script_dir:
+        output_dir = script_dir / 'downloads'
+    else:
+        # If running from elsewhere, create 'videos' folder in current directory
+        output_dir = current_dir / 'videos'
+    
+    # Create directory if not exists
+    output_dir.mkdir(exist_ok=True)
+    
+    return output_dir
+
+
 def generate_subtitle(
     video_path,
     output_srt=None,
@@ -41,6 +69,7 @@ def generate_subtitle(
     turbo_mode=False,
     embedding_method='standard',
     video_title=None,
+    output_dir=None,
 ):
     """
     Generate subtitle from video file
@@ -58,16 +87,21 @@ def generate_subtitle(
         turbo_mode: Enable turbo mode for faster transcription (greedy search)
         embedding_method: Embedding method ('standard', 'fast', 'gpu')
         video_title: Video title (for YouTube videos, used as context for translation)
+        output_dir: Output directory for generated files (default: auto-detect)
     """
     if not os.path.exists(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
+    
+    # Get output directory
+    if output_dir is None:
+        output_dir = get_output_directory()
     
     # Set default output path
     if output_srt is None:
         output_srt = os.path.splitext(video_path)[0] + ".srt"
     
-    # Extract audio
-    audio_path = "temp_audio.wav"
+    # Extract audio to script directory (temp file)
+    audio_path = str(SCRIPT_DIR / "temp_audio.wav")
     audio_path = extract_audio(video_path, audio_path)
     
     # Verify audio file exists
@@ -162,9 +196,8 @@ def generate_subtitle(
                 )
                 sub.text = f"{styling}{text}"
             
-            # Save temporary subtitle for embedding
-            base_name = os.path.splitext(output_srt)[0]
-            temp_srt = f"{base_name}_{target_lang}_temp.srt"
+            # Save temporary subtitle for embedding (in script directory)
+            temp_srt = str(SCRIPT_DIR / f"temp_subtitle_{target_lang}.srt")
             
             # Hapus file temporary lama jika ada
             if os.path.exists(temp_srt):
@@ -172,8 +205,13 @@ def generate_subtitle(
             
             translated_subs.save(temp_srt, encoding="utf-8")
             
+            # Determine output video path
+            video_filename = Path(video_path).stem
+            output_video_name = f"{video_filename}_with_subtitle.mp4"
+            output_video_path = str(output_dir / output_video_name)
+            
             # Embed subtitle to video
-            output_video = embed_subtitle_to_video(video_path, temp_srt, method=embedding_method)
+            output_video = embed_subtitle_to_video(video_path, temp_srt, output_path=output_video_path, method=embedding_method)
             
             # Cleanup temporary files
             from utils.ui import print_substep
@@ -204,12 +242,15 @@ def generate_subtitle(
             os.remove(audio_path)
             print_substep("Cleaned up temporary audio file")
         
-        # Clean up any temp audio files from moviepy
-        temp_files = ['temp-audio.m4a', 'temp-audio.m4a.temp']
+        # Clean up any temp audio files from moviepy (in script directory)
+        temp_files = [
+            SCRIPT_DIR / 'temp-audio.m4a',
+            SCRIPT_DIR / 'temp-audio.m4a.temp'
+        ]
         for temp_file in temp_files:
-            if os.path.exists(temp_file):
+            if temp_file.exists():
                 try:
-                    os.remove(temp_file)
+                    temp_file.unlink()
                 except:
                     pass
 
@@ -456,6 +497,9 @@ def main():
     if video_source is None:
         video_source = ask_video_source()
     
+    # Get output directory
+    output_dir = get_output_directory()
+    
     # Process based on video source
     if video_source == "youtube":
         # Get YouTube URL (from command line or ask user)
@@ -464,10 +508,11 @@ def main():
         else:
             youtube_url = video_input
         
-        # Download YouTube video
+        # Download YouTube video to output directory
         from utils.youtube_downloader import download_youtube_video
         try:
-            video_file, video_title = download_youtube_video(youtube_url)
+            # Download to output directory
+            video_file, video_title = download_youtube_video(youtube_url, output_path=str(output_dir))
         except Exception as e:
             from utils.ui import print_error
             print_error(f"Failed to download YouTube video: {str(e)}")
@@ -515,6 +560,7 @@ def main():
     
     print_header("AUTO SUBTITLE GENERATOR")
     print_info("Video", video_file)
+    print_info("Output Directory", str(output_dir))
     print_info("Model", model)
     print_info("Language", lang if lang else "auto-detect")
     
@@ -548,14 +594,16 @@ def main():
             use_faster_whisper=faster_flag,
             turbo_mode=turbo_flag,
             embedding_method=embedding_method,
-            video_title=video_title if video_source == "youtube" else None
+            video_title=video_title if video_source == "youtube" else None,
+            output_dir=output_dir
         )
         
         # Clean up original YouTube video after successful generation
         if video_source == "youtube" and output_video:
             try:
-                if os.path.exists(video_file):
-                    os.remove(video_file)
+                video_file_path = Path(video_file)
+                if video_file_path.exists():
+                    video_file_path.unlink()
                     from utils.ui import print_substep
                     print_substep(f"Cleaned up original video: {video_file}")
             except Exception as e:

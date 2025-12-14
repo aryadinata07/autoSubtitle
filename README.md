@@ -242,13 +242,30 @@ SUBTITLE_MARGIN=10
 
 ## 📁 Output
 
-The script generates:
-- `video_with_subtitle.mp4` - Video with embedded subtitle
-- `video_dubbed.mp4` - Video with dubbing (if dubbing option selected)
+### Output Directory Logic:
+- **Running from project folder**: Output saved to `downloads/` folder
+- **Running from anywhere else**: Output saved to `videos/` folder in current directory
 
-Translation direction:
-- English video → Indonesian subtitle/dubbing
-- Indonesian video → English subtitle/dubbing
+Example:
+```bash
+# From project folder
+cd C:\project\vidio-subtitle
+autosub -url "https://youtube.com/..."
+# Output: C:\project\vidio-subtitle\downloads\video_with_subtitle.mp4
+
+# From Desktop
+cd C:\Users\YourName\Desktop
+autosub -url "https://youtube.com/..."
+# Output: C:\Users\YourName\Desktop\videos\video_with_subtitle.mp4
+```
+
+### Generated Files:
+- `{video_name}_with_subtitle.mp4` - Video with embedded subtitle
+- Temporary files are automatically cleaned up
+
+### Translation Direction:
+- English video → Indonesian subtitle
+- Indonesian video → English subtitle
 
 ## 🏗️ Project Structure
 
