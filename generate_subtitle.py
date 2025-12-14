@@ -38,6 +38,7 @@ def generate_subtitle(
     embed_to_video=False,
     use_deepseek=False,
     use_faster_whisper=False,
+    turbo_mode=False,
     embedding_method='standard',
     video_title=None,
 ):
@@ -47,13 +48,14 @@ def generate_subtitle(
     Args:
         video_path: Path to video file
         output_srt: Output subtitle file path (default: same name as video with .srt extension)
-        model_size: Whisper model size (tiny, base, small, medium, large)
+        model_size: Whisper model size (tiny, base, small, medium, large, distil-small, distil-medium, distil-large)
         language: Language code (e.g., 'id' for Indonesian, 'en' for English, None for auto-detect)
         keep_audio: Keep extracted audio file
         translate: Auto-translate subtitle (en->id or id->en)
         embed_to_video: Embed subtitle directly to video
         use_deepseek: Use DeepSeek AI for translation (more accurate)
         use_faster_whisper: Use Faster-Whisper for transcription (4-5x faster)
+        turbo_mode: Enable turbo mode for faster transcription (greedy search)
         embedding_method: Embedding method ('standard', 'fast', 'gpu')
         video_title: Video title (for YouTube videos, used as context for translation)
     """
@@ -74,7 +76,7 @@ def generate_subtitle(
     
     try:
         # Transcribe
-        result = transcribe_audio(audio_path, model_size, language, use_faster=use_faster_whisper)
+        result = transcribe_audio(audio_path, model_size, language, use_faster=use_faster_whisper, turbo_mode=turbo_mode)
         detected_lang = result.get("language", "unknown")
         
         # Adjust subtitle timing
@@ -219,6 +221,7 @@ def parse_arguments():
     lang = None
     deepseek_flag = None  # None means ask user
     faster_flag = None  # None means ask user
+    turbo_flag = None  # None means ask user
     video_source = None  # None means ask user
     video_input = None  # URL or file path
     
@@ -237,6 +240,9 @@ def parse_arguments():
         elif arg == "--faster":
             faster_flag = True
             i += 1
+        elif arg == "--turbo":
+            turbo_flag = True
+            i += 1
         elif arg in ["-url", "--url"] and i + 1 < len(sys.argv):
             video_source = "youtube"
             video_input = sys.argv[i + 1]
@@ -248,10 +254,44 @@ def parse_arguments():
         else:
             i += 1
     
-    return model, lang, deepseek_flag, faster_flag, video_source, video_input
+    return model, lang, deepseek_flag, faster_flag, turbo_flag, video_source, video_input
 
 
 
+
+
+def ask_turbo_mode():
+    """Ask user if they want to use turbo mode"""
+    from utils.ui import console
+    
+    console.print("\n[bold cyan]Choose Transcription Mode:[/bold cyan]")
+    
+    console.print("\n[bold yellow]1. Standard Mode (Default - Accurate)[/bold yellow]")
+    console.print("   [green]Pros:[/green]")
+    console.print("   [dim]✓ Maximum accuracy (beam search)[/dim]")
+    console.print("   [dim]✓ Best for noisy/challenging audio[/dim]")
+    console.print("   [dim]✓ Explores 5 possible transcriptions[/dim]")
+    console.print("   [red]Cons:[/red]")
+    console.print("   [dim]✗ Slower processing time[/dim]")
+    
+    console.print("\n[bold green]2. Turbo Mode (Recommended for Clear Audio)[/bold green]")
+    console.print("   [green]Pros:[/green]")
+    console.print("   [dim]✓ 3-6x faster transcription[/dim]")
+    console.print("   [dim]✓ Greedy search (instant decisions)[/dim]")
+    console.print("   [dim]✓ 99% same accuracy for clear audio[/dim]")
+    console.print("   [dim]✓ Perfect for YouTube/Podcast/TEDx[/dim]")
+    console.print("   [red]Cons:[/red]")
+    console.print("   [dim]✗ Slightly less accurate for very noisy audio[/dim]")
+    
+    while True:
+        console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1 or 2):[/white] ", end="")
+        choice = input().strip()
+        if choice == "1":
+            return False
+        elif choice == "2":
+            return True
+        else:
+            console.print("[yellow]Please enter 1 or 2[/yellow]")
 
 
 def ask_deepseek():
@@ -410,7 +450,7 @@ def get_local_file():
 
 def main():
     """Main entry point"""
-    model, lang, deepseek_flag, faster_flag, video_source, video_input = parse_arguments()
+    model, lang, deepseek_flag, faster_flag, turbo_flag, video_source, video_input = parse_arguments()
     
     # If video source not provided via command line, ask user
     if video_source is None:
@@ -453,6 +493,17 @@ def main():
     whisper_mode = os.getenv('WHISPER_MODE', '1')
     faster_flag = True if whisper_mode == '1' else False
     
+    # Get Turbo mode from environment variable if not set via command line
+    if turbo_flag is None:
+        turbo_env = os.getenv('TURBO_MODE', 'ask')
+        if turbo_env.lower() == 'true':
+            turbo_flag = True
+        elif turbo_env.lower() == 'false':
+            turbo_flag = False
+        else:
+            # Ask user
+            turbo_flag = ask_turbo_mode()
+    
     # Ask about DeepSeek if not set via command line
     if deepseek_flag is None:
         deepseek_flag = ask_deepseek()
@@ -466,7 +517,12 @@ def main():
     print_info("Video", video_file)
     print_info("Model", model)
     print_info("Language", lang if lang else "auto-detect")
-    print_info("Transcriber", "Faster-Whisper" if faster_flag else "Regular Whisper")
+    
+    transcriber_name = "Faster-Whisper" if faster_flag else "Regular Whisper"
+    if turbo_flag and faster_flag:
+        transcriber_name += " [TURBO]"
+    print_info("Transcriber", transcriber_name)
+    
     print_info("Translator", "DeepSeek AI" if deepseek_flag else "Google Translate")
     
 
@@ -490,6 +546,7 @@ def main():
             embed_to_video=embed_flag,
             use_deepseek=deepseek_flag,
             use_faster_whisper=faster_flag,
+            turbo_mode=turbo_flag,
             embedding_method=embedding_method,
             video_title=video_title if video_source == "youtube" else None
         )

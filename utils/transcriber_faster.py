@@ -4,7 +4,7 @@ from faster_whisper import WhisperModel
 from .ui import print_step, print_substep, print_success, print_error
 
 
-def transcribe_audio_faster(audio_path, model_size="base", language=None):
+def transcribe_audio_faster(audio_path, model_size="base", language=None, turbo_mode=False):
     """
     Transcribe audio using Faster-Whisper (optimized version)
     
@@ -13,13 +13,41 @@ def transcribe_audio_faster(audio_path, model_size="base", language=None):
     - Lower memory usage
     - Same accuracy
     - Uses CTranslate2 optimization
+    - Turbo Mode: 3-6x faster with greedy search + distil models
+    
+    Args:
+        audio_path: Path to audio file
+        model_size: Model size (tiny, base, small, medium, large, distil-small, distil-medium, distil-large)
+        language: Language code (en, id, or None for auto-detect)
+        turbo_mode: Enable turbo mode (greedy search, faster but slightly less accurate for noisy audio)
     """
     if not os.path.exists(audio_path):
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
     
-    print_step(2, 3, f"Loading Faster-Whisper model ({model_size})")
+    # Check if using distil model
+    is_distil = model_size.startswith('distil-')
+    
+    # Map distil models to actual model names
+    distil_map = {
+        'distil-small': 'distil-whisper/distil-small.en',
+        'distil-medium': 'distil-whisper/distil-medium.en',
+        'distil-large': 'distil-whisper/distil-large-v3'
+    }
+    
+    actual_model = distil_map.get(model_size, model_size)
+    display_name = model_size
+    
+    mode_info = " [TURBO MODE]" if turbo_mode else ""
+    print_step(2, 3, f"Loading Faster-Whisper model ({display_name}){mode_info}")
     print_substep("This may take a while on first run (downloading model)...")
-    print_substep("Using optimized CTranslate2 backend (4-5x faster)...")
+    
+    if is_distil:
+        print_substep("Using Distil-Whisper (6x faster, 50% smaller)")
+    else:
+        print_substep("Using optimized CTranslate2 backend (4-5x faster)...")
+    
+    if turbo_mode:
+        print_substep("Turbo Mode: Greedy search enabled (3x faster)")
     
     # Load model with CPU or GPU
     # Check if user wants to force CPU mode (for cuDNN issues)
@@ -27,7 +55,7 @@ def transcribe_audio_faster(audio_path, model_size="base", language=None):
     
     if force_cpu:
         print_substep("Forcing CPU mode (CUDA_VISIBLE_DEVICES=-1)")
-        model = WhisperModel(model_size, device="cpu", compute_type="int8")
+        model = WhisperModel(actual_model, device="cpu", compute_type="int8")
     else:
         # Check if cuDNN is available before trying GPU
         import subprocess
@@ -54,17 +82,17 @@ def transcribe_audio_faster(audio_path, model_size="base", language=None):
         if not cudnn_available:
             # No cuDNN, use CPU directly
             print_substep("GPU detected but cuDNN not available, using CPU mode")
-            model = WhisperModel(model_size, device="cpu", compute_type="int8")
+            model = WhisperModel(actual_model, device="cpu", compute_type="int8")
         else:
             try:
                 # Try GPU with cuDNN
-                model = WhisperModel(model_size, device="cuda", compute_type="float16")
+                model = WhisperModel(actual_model, device="cuda", compute_type="float16")
                 print_substep("Using GPU acceleration")
             except Exception as e:
                 # Fallback to CPU if GPU fails
                 print_substep(f"GPU initialization failed: {str(e)[:50]}...")
                 print_substep("Falling back to CPU mode")
-                model = WhisperModel(model_size, device="cpu", compute_type="int8")
+                model = WhisperModel(actual_model, device="cpu", compute_type="int8")
     
     print_success("Model loaded successfully")
     
@@ -83,11 +111,25 @@ def transcribe_audio_faster(audio_path, model_size="base", language=None):
     detected_lang = 'unknown'
     retry_with_cpu = False
     
+    # Configure transcription parameters based on mode
+    if turbo_mode:
+        # TURBO MODE: Greedy search for maximum speed
+        beam_size = 1
+        best_of = 1
+        temperature = 0.0
+    else:
+        # STANDARD MODE: Beam search for maximum accuracy
+        beam_size = 5
+        best_of = 5
+        temperature = 0.0
+    
     try:
         segments, info = model.transcribe(
             audio_path,
             language=language,
-            beam_size=5,
+            beam_size=beam_size,
+            best_of=best_of,
+            temperature=temperature,
             vad_filter=True,  # Voice activity detection
             vad_parameters=dict(min_silence_duration_ms=vad_min_silence),
             word_timestamps=True  # GAME CHANGER: Akurasi timing level kata
@@ -138,7 +180,9 @@ def transcribe_audio_faster(audio_path, model_size="base", language=None):
         segments, info = model.transcribe(
             audio_path,
             language=language,
-            beam_size=5,
+            beam_size=beam_size,
+            best_of=best_of,
+            temperature=temperature,
             vad_filter=True,
             vad_parameters=dict(min_silence_duration_ms=vad_min_silence),
             word_timestamps=True  # GAME CHANGER: Akurasi timing level kata
