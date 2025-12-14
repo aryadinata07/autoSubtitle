@@ -17,8 +17,6 @@ from utils import (
     translate_subtitles,
     determine_translation_direction,
     embed_subtitle_to_video,
-    create_dubbed_audio,
-    mix_audio_with_video,
     adjust_subtitle_timing,
     optimize_subtitle_gaps,
 )
@@ -42,7 +40,6 @@ def generate_subtitle(
     use_faster_whisper=False,
     embedding_method='standard',
     video_title=None,
-    dubbing_method=None,
 ):
     """
     Generate subtitle from video file
@@ -173,44 +170,16 @@ def generate_subtitle(
             
             translated_subs.save(temp_srt, encoding="utf-8")
             
-            # Generate dubbed audio if requested
-            video_to_embed = video_path
-            if dubbing_method:
-                # Convert translated subtitles to segments format
-                dubbed_segments = []
-                for sub in translated_subs:
-                    dubbed_segments.append({
-                        'text': sub.text,
-                        'start': sub.start.ordinal / 1000.0,  # Convert to seconds
-                        'end': sub.end.ordinal / 1000.0
-                    })
-                
-                # Generate dubbed audio
-                dubbed_audio_path = create_dubbed_audio(
-                    dubbed_segments,
-                    method=dubbing_method,
-                    target_lang=target_lang
-                )
-                
-                if dubbed_audio_path:
-                    # Mix dubbed audio with video
-                    dubbed_video_path = mix_audio_with_video(
-                        video_path,
-                        dubbed_audio_path,
-                        output_path=f"{base_name}_dubbed_temp.mp4"
-                    )
-                    video_to_embed = dubbed_video_path
-                    
-                    # Cleanup dubbed audio
-                    if os.path.exists(dubbed_audio_path):
-                        os.remove(dubbed_audio_path)
+            # Embed subtitle to video
+            output_video = embed_subtitle_to_video(video_path, temp_srt, method=embedding_method)
             
-            # Embed to video
-            output_video = embed_subtitle_to_video(video_to_embed, temp_srt, method=embedding_method)
+            # Cleanup temporary files
+            from utils.ui import print_substep
             
             # Delete temporary SRT file
             if os.path.exists(temp_srt):
                 os.remove(temp_srt)
+                print_substep("Cleaned up temporary subtitle file")
             
             # Print summary
             summary_data = {
@@ -318,45 +287,6 @@ def ask_deepseek():
             return True
         else:
             console.print("[yellow]Please enter 1 or 2[/yellow]")
-
-
-def ask_dubbing_option():
-    """Ask user if they want to add voice dubbing"""
-    from utils.ui import console
-    
-    console.print("\n[bold cyan]Voice Dubbing Option:[/bold cyan]")
-    
-    console.print("\n[bold yellow]1. No Dubbing (Default)[/bold yellow]")
-    console.print("   [dim]Only add subtitle, keep original audio[/dim]")
-    
-    console.print("\n[bold green]2. gTTS Dubbing (Fast)[/bold green]")
-    console.print("   [green]Pros:[/green]")
-    console.print("   [dim]✓ Free and unlimited[/dim]")
-    console.print("   [dim]✓ Very fast processing[/dim]")
-    console.print("   [dim]✓ Support many languages[/dim]")
-    console.print("   [red]Cons:[/red]")
-    console.print("   [dim]✗ Robotic voice, not natural[/dim]")
-    
-    console.print("\n[bold magenta]3. pyttsx3 TTS (Offline)[/bold magenta]")
-    console.print("   [green]Pros:[/green]")
-    console.print("   [dim]✓ Free and offline[/dim]")
-    console.print("   [dim]✓ No internet required[/dim]")
-    console.print("   [dim]✓ Uses system voices[/dim]")
-    console.print("   [red]Cons:[/red]")
-    console.print("   [dim]✗ Voice quality depends on system[/dim]")
-    console.print("   [dim]✗ Limited voice options[/dim]")
-    
-    while True:
-        console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1, 2, or 3):[/white] ", end="")
-        choice = input().strip()
-        if choice == "1":
-            return None  # No dubbing
-        elif choice == "2":
-            return 'gtts'
-        elif choice == "3":
-            return 'piper'
-        else:
-            console.print("[yellow]Please enter 1, 2, or 3[/yellow]")
 
 
 def ask_embedding_method():
@@ -527,12 +457,7 @@ def main():
     if deepseek_flag is None:
         deepseek_flag = ask_deepseek()
     
-    # Ask about dubbing option (only if enabled in .env)
-    dubbing_enabled = os.getenv('ENABLE_DUBBING', 'false').lower() == 'true'
-    if dubbing_enabled:
-        dubbing_method = ask_dubbing_option()
-    else:
-        dubbing_method = None
+
     
     # Ask about embedding method
     embedding_method = ask_embedding_method()
@@ -544,13 +469,7 @@ def main():
     print_info("Transcriber", "Faster-Whisper" if faster_flag else "Regular Whisper")
     print_info("Translator", "DeepSeek AI" if deepseek_flag else "Google Translate")
     
-    # Show dubbing method
-    dubbing_names = {
-        'gtts': 'gTTS (Fast)',
-        'piper': 'pyttsx3 (Offline)',
-        None: 'No Dubbing'
-    }
-    print_info("Dubbing", dubbing_names.get(dubbing_method, "No Dubbing"))
+
     
     # Show embedding method
     embedding_names = {
@@ -560,10 +479,7 @@ def main():
     }
     print_info("Embedding", embedding_names.get(embedding_method, embedding_method))
     
-    output_desc = "Video with subtitle"
-    if dubbing_method:
-        output_desc += " + dubbing"
-    print_info("Output", output_desc)
+    print_info("Output", "Video with subtitle")
     
     try:
         output_video = generate_subtitle(
@@ -575,8 +491,7 @@ def main():
             use_deepseek=deepseek_flag,
             use_faster_whisper=faster_flag,
             embedding_method=embedding_method,
-            video_title=video_title if video_source == "youtube" else None,
-            dubbing_method=dubbing_method
+            video_title=video_title if video_source == "youtube" else None
         )
         
         # Clean up original YouTube video after successful generation

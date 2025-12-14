@@ -7,10 +7,10 @@ Automatically generate subtitles and voice dubbing for videos using Whisper AI.
 - 🎯 **Automatic Transcription** - Using OpenAI Whisper (Faster-Whisper by default)
 - 🌍 **Auto Translation** - English ↔ Indonesian with Google Translate or DeepSeek AI
 - 🎬 **Video Embedding** - Hardcode subtitles directly into video (3 encoding methods)
-- 🎤 **Voice Dubbing** - Generate AI voice dubbing (gTTS or Piper TTS)
 - 📺 **YouTube Support** - Download and process YouTube videos automatically
 - ⚡ **GPU Acceleration** - Support for NVIDIA GPU (CUDA) for faster processing
 - 🎨 **Customizable Styling** - Adjust subtitle appearance via .env configuration
+- 🎬 **Auto-detect Video Orientation** - Automatically adjust subtitle size for Reels/Shorts
 
 ## 📋 Requirements
 
@@ -133,34 +133,7 @@ Configure in `.env`: `WHISPER_MODE=1` (Faster) or `WHISPER_MODE=2` (Regular)
 - ✅ Batch processing (10x faster)
 - ⚠️ Requires API key (very cheap)
 
-### 3. Voice Dubbing (BETA - Experimental)
-
-> ⚠️ **WARNING**: This feature is experimental and disabled by default. Enable in `.env` by setting `ENABLE_DUBBING=true`
-
-**Known Issues:**
-- Audio timing may not sync perfectly with video
-- Voice quality varies depending on TTS engine
-- Significantly increases processing time
-- May require additional troubleshooting
-
-**No Dubbing (Default)**
-- Only adds subtitle, keeps original audio
-
-**gTTS (Fast)**
-- ✅ Free and unlimited
-- ✅ Very fast processing
-- ⚠️ Robotic voice
-- ⚠️ May have timing issues
-
-**pyttsx3 TTS (Offline)**
-- ✅ Free and offline
-- ✅ No internet required
-- ✅ Uses system voices
-- ⚠️ Voice quality depends on system
-- ⚠️ Limited voice options
-- ⚠️ May have timing issues
-
-### 4. Video Embedding Methods
+### 3. Video Embedding Methods
 
 **Standard Quality**
 - ✅ Best quality
@@ -177,7 +150,7 @@ Configure in `.env`: `WHISPER_MODE=1` (Faster) or `WHISPER_MODE=2` (Regular)
 - ✅ Quality almost same as standard
 - ⚠️ Requires NVIDIA GPU with CUDA
 
-### 5. Subtitle Styling
+### 4. Subtitle Styling
 
 Configure in `.env`:
 
