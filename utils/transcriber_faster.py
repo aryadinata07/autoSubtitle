@@ -135,9 +135,11 @@ def transcribe_audio_faster(audio_path, model_size="base", language=None, turbo_
             word_timestamps=True  # GAME CHANGER: Akurasi timing level kata
         )
         
-        # Convert segments to list (error might happen here during iteration)
+        # Convert segments to list with progress bar
+        from tqdm import tqdm
         try:
-            for segment in segments:
+            print_substep("Processing segments...")
+            for segment in tqdm(segments, desc="      Transcribing", unit="segment", ncols=80):
                 result_segments.append({
                     'start': segment.start,
                     'end': segment.end,
@@ -188,9 +190,11 @@ def transcribe_audio_faster(audio_path, model_size="base", language=None, turbo_
             word_timestamps=True  # GAME CHANGER: Akurasi timing level kata
         )
         
-        # Convert segments to list
+        # Convert segments to list with progress bar
+        from tqdm import tqdm
         result_segments = []
-        for segment in segments:
+        print_substep("Processing segments...")
+        for segment in tqdm(segments, desc="      Transcribing", unit="segment", ncols=80):
             result_segments.append({
                 'start': segment.start,
                 'end': segment.end,

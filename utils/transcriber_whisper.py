@@ -34,32 +34,40 @@ def transcribe_audio_whisper(audio_path, model_size="base", language=None, turbo
     
     print_substep(f"Transcribing audio...")
     print_substep(f"Language: {language if language else 'auto-detect'}")
-    print_substep(f"Please wait, this may take a few minutes...")
     
     # Transcribe with progress callback
     try:
-        # Configure parameters based on mode
-        if turbo_mode:
-            # TURBO MODE: Greedy decoding for maximum speed
-            # beam_size=None means greedy (fastest)
-            # best_of=1 means no sampling (deterministic)
-            result = model.transcribe(
-                audio_path,
-                language=language,
-                verbose=False,
-                fp16=False,
-                beam_size=None,  # Greedy decoding (fastest)
-                best_of=1,       # No sampling
-                temperature=0.0  # Deterministic
-            )
-        else:
-            # STANDARD MODE: Beam search for maximum accuracy
-            result = model.transcribe(
-                audio_path,
-                language=language,
-                verbose=False,  # Hide detailed output
-                fp16=False  # Better compatibility
-            )
+        # Show progress bar during transcription
+        from tqdm import tqdm
+        import sys
+        
+        # Create progress bar
+        with tqdm(total=100, desc="      Transcribing", unit="%", ncols=80) as pbar:
+            # Configure parameters based on mode
+            if turbo_mode:
+                # TURBO MODE: Greedy decoding for maximum speed
+                # beam_size=None means greedy (fastest)
+                # best_of=1 means no sampling (deterministic)
+                result = model.transcribe(
+                    audio_path,
+                    language=language,
+                    verbose=False,
+                    fp16=False,
+                    beam_size=None,  # Greedy decoding (fastest)
+                    best_of=1,       # No sampling
+                    temperature=0.0  # Deterministic
+                )
+            else:
+                # STANDARD MODE: Beam search for maximum accuracy
+                result = model.transcribe(
+                    audio_path,
+                    language=language,
+                    verbose=False,  # Hide detailed output
+                    fp16=False  # Better compatibility
+                )
+            
+            # Complete progress bar
+            pbar.update(100)
     except Exception as e:
         print_error("Transcription failed!")
         print_substep(f"Error: {str(e)}")

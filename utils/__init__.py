@@ -8,6 +8,17 @@ from .translator_deepseek import translate_with_deepseek
 from .video_embedder import embed_subtitle_to_video
 from .youtube_downloader import download_youtube_video, is_youtube_url
 from .timing_adjuster import adjust_subtitle_timing, optimize_subtitle_gaps
+from .checkpoint import CheckpointManager, cleanup_old_checkpoints
+from .error_handler import (
+    SubtitleError,
+    TranscriptionError,
+    TranslationError,
+    VideoProcessingError,
+    DownloadError,
+    handle_transcription_error,
+    handle_translation_error,
+    handle_video_error,
+)
 
 __all__ = [
     "extract_audio",
@@ -22,4 +33,14 @@ __all__ = [
     "is_youtube_url",
     "adjust_subtitle_timing",
     "optimize_subtitle_gaps",
+    "CheckpointManager",
+    "cleanup_old_checkpoints",
+    "SubtitleError",
+    "TranscriptionError",
+    "TranslationError",
+    "VideoProcessingError",
+    "DownloadError",
+    "handle_transcription_error",
+    "handle_translation_error",
+    "handle_video_error",
 ]

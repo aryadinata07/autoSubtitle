@@ -11,6 +11,7 @@ Automatically generate subtitles and voice dubbing for videos using Whisper AI.
 - ⚡ **GPU Acceleration** - Support for NVIDIA GPU (CUDA) for faster processing
 - 🎨 **Customizable Styling** - Adjust subtitle appearance via .env configuration
 - 🎬 **Auto-detect Video Orientation** - Automatically adjust subtitle size for Reels/Shorts
+- 💾 **Checkpoint & Resume** - Auto-save progress, resume if interrupted (NEW!)
 
 ## 📋 Requirements
 
@@ -156,6 +157,7 @@ python generate_subtitle.py -l "video.mp4"
 - `--lang <code>` - Language code: id, en, or auto-detect (default: auto)
 - `--turbo` - Force turbo mode (can override preset)
 - `--deepseek` - Force DeepSeek AI (can override preset)
+- `--no-resume` - Disable checkpoint/resume feature
 
 ## 🎯 Features Explained
 
@@ -203,20 +205,31 @@ Configure in `.env`: `TURBO_MODE=true` (always on), `false` (always off), or `as
 
 ### 3. Video Embedding Methods
 
-**Fast Encoding (Default - Recommended)**
-- ✅ 2-3x faster (~4-6 min for 17 min video)
-- ✅ Still good quality
-- ✅ Best balance of speed and quality
-- ⚠️ Slightly lower quality (barely noticeable)
+**Soft Subtitle - INSTANT ⚡ (Default - Recommended)**
+- ✅ **INSTANT (1-5 seconds only!)**
+- ✅ No quality loss (stream copy, no re-encoding)
+- ✅ Subtitle can be toggled On/Off in player
+- ✅ Perfect for YouTube, PC playback
+- ✅ YouTube auto-detects and shows subtitle
+- ⚠️ Not visible on Instagram/TikTok (use hardsub for social media)
+- ⚠️ Need to enable subtitle in player (VLC: press 'V' key)
 
-**Standard Quality**
+**Hardsub - Fast Encoding**
+- ✅ 3-4x faster (~3-5 min for 17 min video)
+- ✅ Works on all platforms (Instagram, TikTok)
+- ✅ Subtitle permanently burned into video
+- ⚠️ Slightly lower quality than standard
+
+**Hardsub - Standard Quality**
 - ✅ Best quality
-- ✅ Compatible with all players
+- ✅ Works on all platforms
+- ✅ Subtitle permanently burned into video
 - ⚠️ Slowest (~12-13 min for 17 min video)
 
-**GPU Accelerated**
-- ✅ 3-5x faster (~2-3 min for 17 min video)
-- ✅ Quality almost same as standard
+**Hardsub - GPU Accelerated**
+- ✅ Fastest hardsub (~2-3 min for 17 min video)
+- ✅ Works on all platforms
+- ✅ Good quality
 - ⚠️ Requires NVIDIA GPU with CUDA
 
 ### 4. Subtitle Styling
@@ -330,8 +343,8 @@ autosub -url "https://youtube.com/..." -default
 **Configuration:**
 - 🎯 Standard Mode (beam search, maximum accuracy)
 - 🤖 DeepSeek AI (better translation)
-- ⚡ Fast Encoding (2-3x faster)
-- ✅ Best for: General use, balanced quality/speed
+- ⚡ Hardsub - Fast Encoding (~3-5 min for 17 min video)
+- ✅ Best for: General use, works everywhere
 
 ### 2. Fast Mode (Recommended for Most Users) 🚀
 ```bash
@@ -340,8 +353,8 @@ autosub -url "https://youtube.com/..." -fast
 **Configuration:**
 - ⚡ Turbo Mode (greedy search, 3-6x faster)
 - 🤖 DeepSeek AI (better translation)
-- ⚡ Fast Encoding (2-3x faster)
-- ✅ Best for: YouTube videos, podcasts, clear audio
+- ⚡ Hardsub - Fast Encoding (~3-5 min for 17 min video)
+- ✅ Best for: YouTube, Instagram, TikTok, all platforms
 
 ### 3. Quality Mode (Maximum Accuracy) 💎
 ```bash
@@ -350,8 +363,8 @@ autosub -url "https://youtube.com/..." -quality
 **Configuration:**
 - 🎯 Standard Mode (beam search, maximum accuracy)
 - 🤖 DeepSeek AI (better translation)
-- 🎬 Standard Encoding (best quality)
-- ✅ Best for: Professional work, important content
+- 🎬 Hardsub - Standard Encoding (best quality)
+- ✅ Best for: Professional work, maximum quality
 
 ### 4. Speed Mode (Maximum Speed) ⚡⚡⚡
 ```bash
@@ -360,7 +373,7 @@ autosub -url "https://youtube.com/..." -speed
 **Configuration:**
 - ⚡ Turbo Mode (greedy search, 3-6x faster)
 - 🌐 Google Translate (free, no API key)
-- ⚡ Fast Encoding (2-3x faster)
+- ⚡ Hardsub - Fast Encoding (~3-5 min for 17 min video)
 - ✅ Best for: Quick tests, batch processing
 
 ### 5. Budget Mode (Free, No API Key) 💰
@@ -370,18 +383,18 @@ autosub -url "https://youtube.com/..." -budget
 **Configuration:**
 - 🎯 Standard Mode (beam search, maximum accuracy)
 - 🌐 Google Translate (free, no API key)
-- ⚡ Fast Encoding (2-3x faster)
+- ⚡ Hardsub - Fast Encoding (~3-5 min for 17 min video)
 - ✅ Best for: No DeepSeek API key, free usage
 
 ### Comparison Table
 
 | Preset | Transcription | Translation | Encoding | Speed | Quality | API Key |
 |--------|--------------|-------------|----------|-------|---------|---------|
-| **-default** | Standard | DeepSeek | Fast | ⚡⚡ | ⭐⭐⭐⭐ | Required |
-| **-fast** | Turbo | DeepSeek | Fast | ⚡⚡⚡⚡ | ⭐⭐⭐⭐ | Required |
-| **-quality** | Standard | DeepSeek | Standard | ⚡ | ⭐⭐⭐⭐⭐ | Required |
-| **-speed** | Turbo | Google | Fast | ⚡⚡⚡⚡⚡ | ⭐⭐⭐ | Not Required |
-| **-budget** | Standard | Google | Fast | ⚡⚡ | ⭐⭐⭐ | Not Required |
+| **-default** | Standard | DeepSeek | Fast Hardsub | ⚡⚡⚡ | ⭐⭐⭐⭐ | Required |
+| **-fast** | Turbo | DeepSeek | Fast Hardsub | ⚡⚡⚡⚡ | ⭐⭐⭐⭐ | Required |
+| **-quality** | Standard | DeepSeek | Standard Hardsub | ⚡ | ⭐⭐⭐⭐⭐ | Required |
+| **-speed** | Turbo | Google | Fast Hardsub | ⚡⚡⚡⚡⚡ | ⭐⭐⭐ | Not Required |
+| **-budget** | Standard | Google | Fast Hardsub | ⚡⚡⚡ | ⭐⭐⭐ | Not Required |
 
 ### Advanced Combinations
 ```bash
@@ -428,6 +441,57 @@ autosub -l "video.mp4"
 ```
 
 ---
+
+## �  Soft Subtitle vs Hardsub
+
+### What is Soft Subtitle?
+
+**Soft Subtitle** = Subtitle embedded as separate track (like audio track)
+- Subtitle stored as text data inside video container
+- Can be toggled On/Off in player
+- No quality loss (no re-encoding)
+- **INSTANT** processing (1-5 seconds)
+
+**Hardsub** = Subtitle burned into video permanently
+- Subtitle "painted" on every frame
+- Cannot be turned off
+- Requires full video re-encoding
+- Takes 2-13 minutes depending on method
+
+### How to View Soft Subtitle
+
+**VLC Player:**
+1. Open video
+2. Press `V` key to cycle subtitle tracks
+3. Or: Right-click → Subtitle → Track 1
+
+**MPC-HC:**
+1. Open video
+2. Right-click → Subtitles → Track 1 (Indonesian)
+
+**YouTube:**
+1. Upload video
+2. Subtitle automatically detected
+3. Viewers can enable via CC button
+
+**Windows Media Player:**
+- ⚠️ Does NOT support soft subtitle
+- Use VLC or MPC-HC instead
+
+### When to Use Each?
+
+**Use Soft Subtitle (Default) when:**
+- ✅ Uploading to YouTube
+- ✅ Watching on PC/laptop
+- ✅ Want flexibility to toggle subtitle
+- ✅ Want instant processing
+- ✅ Want original quality
+
+**Use Hardsub when:**
+- ✅ Uploading to Instagram/TikTok/Facebook
+- ✅ Sharing on WhatsApp/Telegram
+- ✅ Viewer might not know how to enable subtitle
+- ✅ Want subtitle always visible
 
 ## 💡 Tips
 
@@ -501,6 +565,54 @@ For best results and reliability, **download videos manually first**, then proce
 
 ### 💡 Pro Tip
 The fallback system usually works! Just run the command and let it try all methods automatically.
+
+---
+
+## 💾 Checkpoint & Resume System
+
+### Automatic Progress Saving
+
+The script automatically saves progress after each major step:
+1. ✅ **Transcription** - Audio transcribed to text
+2. ✅ **Translation** - Subtitles translated
+3. ✅ **Embedding** - Video with subtitles created
+
+### How It Works
+
+**If process is interrupted:**
+```bash
+# First run (interrupted at translation)
+autosub -l video.mp4 -default
+# [1/4] Extract audio ✓
+# [2/4] Transcription ✓
+# [3/4] Translation... ❌ CRASH!
+
+# Second run (auto-resumes)
+autosub -l video.mp4 -default
+# ⚠ Found previous progress
+# ⚠ Last step: transcription
+# ⚠ Resuming from checkpoint...
+# [3/4] Translation ✓ (continues from here!)
+# [4/4] Embedding ✓
+```
+
+### Benefits
+
+- ✅ **Save Time** - Don't re-process completed steps
+- ✅ **Reliable** - Survive crashes, power loss, network issues
+- ✅ **Automatic** - No manual intervention needed
+- ✅ **Smart Cleanup** - Auto-deletes checkpoints after 7 days
+
+### Disable Resume
+
+If you want to start fresh:
+```bash
+autosub -l video.mp4 -default --no-resume
+```
+
+### Checkpoint Location
+
+Checkpoints stored in: `.checkpoints/` folder (auto-created, git-ignored)
 
 ---
 
