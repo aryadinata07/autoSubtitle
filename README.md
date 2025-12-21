@@ -6,12 +6,13 @@ Automatically generate subtitles and voice dubbing for videos using Whisper AI.
 
 - 🎯 **Automatic Transcription** - Using OpenAI Whisper (Faster-Whisper by default)
 - 🌍 **Auto Translation** - English ↔ Indonesian with Google Translate or DeepSeek AI
+- 🛡️ **SubtitleShield V2.1** - AI-powered quality control with contextual repair (NEW!)
 - 🎬 **Video Embedding** - Hardcode subtitles directly into video (3 encoding methods)
 - 📺 **YouTube Support** - Download and process YouTube videos automatically
 - ⚡ **GPU Acceleration** - Support for NVIDIA GPU (CUDA) for faster processing
 - 🎨 **Customizable Styling** - Adjust subtitle appearance via .env configuration
 - 🎬 **Auto-detect Video Orientation** - Automatically adjust subtitle size for Reels/Shorts
-- 💾 **Checkpoint & Resume** - Auto-save progress, resume if interrupted (NEW!)
+- 💾 **Checkpoint & Resume** - Auto-save progress, resume if interrupted
 
 ## 📋 Requirements
 
@@ -92,6 +93,9 @@ autosub -url "https://youtube.com/..." -speed
 
 # Budget mode (free, no API key)
 autosub -url "https://youtube.com/..." -budget
+
+# Instant mode (soft subtitle, no re-encoding)
+autosub -url "https://youtube.com/..." -instant
 ```
 
 ### Command Line Mode
@@ -122,6 +126,9 @@ python generate_subtitle.py -l "video.mp4" -speed
 
 # Budget mode (free, no API key)
 python generate_subtitle.py -l "video.mp4" -budget
+
+# Instant mode (soft subtitle, no re-encoding)
+python generate_subtitle.py -l "video.mp4" -instant
 ```
 
 **With Custom Options:**
@@ -147,6 +154,7 @@ python generate_subtitle.py -l "video.mp4"
 - `-quality` - Quality mode (Standard + DeepSeek + Standard Encoding)
 - `-speed` - Speed mode (Turbo + Google + Fast Encoding)
 - `-budget` - Budget mode (Standard + Google + Fast Encoding) 💰 No API key
+- `-instant` - Instant mode (Standard + DeepSeek + Soft Subtitle) ⚡ No re-encoding
 
 **Video Source:**
 - `-url <url>` or `--url <url>` - YouTube URL
@@ -194,7 +202,16 @@ Configure in `.env`: `TURBO_MODE=true` (always on), `false` (always off), or `as
 - ✅ Context-aware (understands video topic)
 - ✅ Batch processing (10x faster)
 - ✅ Better translation quality
+- ✅ **SubtitleShield V2.1** - AI-powered quality control
 - ⚠️ Requires API key (very cheap - ~$0.14 per 1M tokens)
+
+**SubtitleShield V2.1 Features:**
+- 🛡️ **Batch Processing** - Reviews ALL subtitles (not just first 50)
+- 🔍 **Context Window** - AI sees previous + current + next subtitle for better accuracy
+- 📊 **Statistics Report** - Detailed transparency report
+- ✏️ **Auto-Repair** - Fixes mistranslations automatically
+- 🗑️ **Anomaly Detection** - Removes hallucinations
+- 🎯 **Side-by-Side Comparison** - Original vs Translation verification
 
 **Google Translate (Free Fallback)**
 - ✅ Free, no API key required
@@ -202,6 +219,7 @@ Configure in `.env`: `TURBO_MODE=true` (always on), `false` (always off), or `as
 - ✅ Good for basic translation
 - ⚠️ Sometimes too literal/stiff
 - ⚠️ Not context-aware
+- ⚠️ No quality control
 
 ### 3. Video Embedding Methods
 
@@ -386,6 +404,16 @@ autosub -url "https://youtube.com/..." -budget
 - ⚡ Hardsub - Fast Encoding (~3-5 min for 17 min video)
 - ✅ Best for: No DeepSeek API key, free usage
 
+### 6. Instant Mode (No Re-encoding) ⚡⚡⚡
+```bash
+autosub -url "https://youtube.com/..." -instant
+```
+**Configuration:**
+- 🎯 Standard Mode (beam search, maximum accuracy)
+- 🤖 DeepSeek AI (better translation)
+- 💨 Soft Subtitle (INSTANT, 1-5 seconds, no re-encoding)
+- ✅ Best for: YouTube, PC playback, instant results, original quality
+
 ### Comparison Table
 
 | Preset | Transcription | Translation | Encoding | Speed | Quality | API Key |
@@ -395,6 +423,7 @@ autosub -url "https://youtube.com/..." -budget
 | **-quality** | Standard | DeepSeek | Standard Hardsub | ⚡ | ⭐⭐⭐⭐⭐ | Required |
 | **-speed** | Turbo | Google | Fast Hardsub | ⚡⚡⚡⚡⚡ | ⭐⭐⭐ | Not Required |
 | **-budget** | Standard | Google | Fast Hardsub | ⚡⚡⚡ | ⭐⭐⭐ | Not Required |
+| **-instant** | Standard | DeepSeek | Soft Subtitle | ⚡⚡⚡⚡⚡⚡ | ⭐⭐⭐⭐⭐ | Required |
 
 ### Advanced Combinations
 ```bash
@@ -429,6 +458,9 @@ autosub -l "video.mp4" --model large -quality
 
 # No API key (free)
 autosub -l "video.mp4" -budget
+
+# Instant (soft subtitle, no re-encoding)
+autosub -l "video.mp4" -instant
 
 # Maximum speed (18x faster!)
 autosub -l "video.mp4" --model distil-large -speed

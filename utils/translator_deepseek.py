@@ -63,8 +63,8 @@ def translate_batch_with_deepseek(texts, source_lang, target_lang, api_key, glob
         if prev_context:
             context_instruction += f"\n[Previous Sentence]: ...{prev_context}"
         
-        # System prompt: Strict line-by-line + Punctuation awareness
-        system_prompt = f"""You are a professional subtitle translator.
+        # System prompt: Strict line-by-line + Punctuation awareness + Human-like anomaly detection
+        system_prompt = f"""You are a professional subtitle translator with human-like context awareness.
 Target: {target_name}.
 Style: Natural, conversational, slang allowed.
 
@@ -74,7 +74,20 @@ CRITICAL RULES:
 3. OUTPUT MUST HAVE EXACTLY {len(texts)} LINES.
 4. Return ONLY the numbered list (e.g. "1. translation").
 5. PUNCTUATION MATTERS: If the input sentence is incomplete/continues to next line, DO NOT put a period (.) at the end. Only use periods/question marks/exclamation marks if the thought is completely finished.
-6. No explanations, no extra text."""
+6. No explanations, no extra text.
+
+🧠 HUMAN-LIKE ANOMALY DETECTION:
+Think like a human watching this video. If a subtitle feels "off" or disconnected from the video context:
+- Random phrases like "Thank you for watching" appearing mid-video (not at the end)
+- "Subscribe to my channel" appearing randomly without context
+- Copyright notices or credits appearing in the middle of content
+- Repeated phrases that don't match the flow
+- Nonsensical text that seems like AI hallucination
+
+If you detect such anomalies, replace the translation with: [SKIP]
+
+IMPORTANT: Only mark as [SKIP] if you're confident it's an anomaly. When in doubt, translate it normally.
+Real speech (even if it sounds like a closing) should be translated if it fits the context."""
         
         user_prompt = f"""Translate these {len(texts)} lines from {source_name} to {target_name}.
 Keep the exact same number of lines. Do not merge text.
@@ -97,8 +110,9 @@ Output ({len(texts)} lines):"""
         
         response_text = response.choices[0].message.content.strip()
         
-        # ROBUST PARSING: Regex-based line-by-line extraction
+        # ROBUST PARSING: Regex-based line-by-line extraction + Anomaly detection
         translations = []
+        skipped_count = 0
         import re
         
         for line in response_text.split('\n'):
@@ -110,16 +124,26 @@ Output ({len(texts)} lines):"""
             match = re.match(r'^\d+[\.\)\s]+(.*)', line)
             if match:
                 translation = match.group(1).strip()
+                
+                # Human-like anomaly detection: Skip lines marked by DeepSeek
+                if translation.upper() == "[SKIP]" or translation.upper() == "SKIP":
+                    skipped_count += 1
+                    continue  # Don't add to translations (effectively removes the subtitle)
+                
                 if translation:  # Only add non-empty translations
                     translations.append(translation)
         
-        # RELAXED VALIDATION: Allow slight mismatch (DeepSeek might merge short subtitles)
+        # Log anomaly detection if any found
+        if skipped_count > 0:
+            print_substep(f"🧠 AI detected {skipped_count} anomaly/anomalies (skipped)")
+        
+        # RELAXED VALIDATION: Allow mismatch due to anomaly filtering or merging
         if len(translations) == 0:
             return texts
         
-        # If count doesn't match, try to handle it gracefully
+        # If count doesn't match, handle gracefully
         if len(translations) != len(texts):
-            # If we got fewer translations, pad with originals
+            # If we got fewer translations (due to anomaly filtering), pad with originals
             if len(translations) < len(texts):
                 while len(translations) < len(texts):
                     translations.append(texts[len(translations)])
@@ -143,6 +167,7 @@ def translate_with_deepseek(subs, source_lang, target_lang, api_key, video_title
     - Sliding window: Flow mulus antar batch
     - Natural Indonesian slang mode
     - Batch processing (10x faster)
+    - SubtitleShield V2.1: Contextual repair with side-by-side comparison
     
     Args:
         subs: Subtitle entries
@@ -152,6 +177,20 @@ def translate_with_deepseek(subs, source_lang, target_lang, api_key, video_title
         video_title: Video title (optional, used as additional context)
     """
     print_step(3, 4, "Translating with DeepSeek AI...")
+    
+    # Save original subtitles for SubtitleShield comparison (DEEP COPY)
+    import pysrt
+    import copy
+    original_subs = pysrt.SubRipFile()
+    for sub in subs:
+        # Deep copy to preserve original text before translation
+        new_sub = pysrt.SubRipItem(
+            index=sub.index,
+            start=sub.start,
+            end=sub.end,
+            text=sub.text  # This is the original text (before translation)
+        )
+        original_subs.append(new_sub)
     
     # Get global video context
     context = get_video_context(subs)
@@ -200,5 +239,18 @@ def translate_with_deepseek(subs, source_lang, target_lang, api_key, video_title
             except Exception as e:
                 print_warning(f"Batch failed: {str(e)}")
                 pbar.update(len(batch))
+    
+    # 🛡️ SubtitleShield V2.1: Contextual repair with side-by-side comparison
+    from .subtitle_shield import subtitle_shield_review
+    
+    print()  # Newline for better formatting
+    subs, shield_report = subtitle_shield_review(
+        subs,
+        source_lang,
+        target_lang,
+        api_key,
+        video_title=video_title,
+        original_subs=original_subs  # Pass original for comparison
+    )
     
     return subs

@@ -103,3 +103,32 @@ def cleanup_old_checkpoints(max_age_days=7):
         file_age = current_time - checkpoint_file.stat().st_mtime
         if file_age > max_age_seconds:
             checkpoint_file.unlink()
+
+
+def list_checkpoints():
+    """
+    List all available checkpoints
+    
+    Returns:
+        list: List of checkpoint data dicts, sorted by timestamp (newest first)
+    """
+    script_dir = Path(__file__).parent.parent
+    checkpoint_dir = script_dir / '.checkpoints'
+    
+    if not checkpoint_dir.exists():
+        return []
+    
+    checkpoints = []
+    
+    for checkpoint_file in checkpoint_dir.glob('*.json'):
+        try:
+            with open(checkpoint_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                checkpoints.append(data)
+        except Exception:
+            continue
+    
+    # Sort by timestamp (newest first)
+    checkpoints.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+    
+    return checkpoints

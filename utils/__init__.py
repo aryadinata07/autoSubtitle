@@ -5,10 +5,12 @@ from .subtitle_creator import create_srt
 from .translator import translate_subtitles, determine_translation_direction
 from .translator_google import translate_with_google
 from .translator_deepseek import translate_with_deepseek
+from .subtitle_shield import subtitle_shield_review
 from .video_embedder import embed_subtitle_to_video
 from .youtube_downloader import download_youtube_video, is_youtube_url
 from .timing_adjuster import adjust_subtitle_timing, optimize_subtitle_gaps
-from .checkpoint import CheckpointManager, cleanup_old_checkpoints
+from .timing_deepseek import analyze_sentence_structure
+from .checkpoint import CheckpointManager, cleanup_old_checkpoints, list_checkpoints
 from .error_handler import (
     SubtitleError,
     TranscriptionError,
@@ -28,11 +30,13 @@ __all__ = [
     "determine_translation_direction",
     "translate_with_google",
     "translate_with_deepseek",
+    "subtitle_shield_review",
     "embed_subtitle_to_video",
     "download_youtube_video",
     "is_youtube_url",
     "adjust_subtitle_timing",
     "optimize_subtitle_gaps",
+    "analyze_sentence_structure",
     "CheckpointManager",
     "cleanup_old_checkpoints",
     "SubtitleError",

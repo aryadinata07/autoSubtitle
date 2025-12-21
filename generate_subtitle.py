@@ -24,6 +24,7 @@ from utils import (
     embed_subtitle_to_video,
     adjust_subtitle_timing,
     optimize_subtitle_gaps,
+    analyze_sentence_structure,
     CheckpointManager,
     cleanup_old_checkpoints,
     handle_transcription_error,
@@ -151,8 +152,24 @@ def generate_subtitle(
                 result = transcribe_audio(audio_path, model_size, language, use_faster=use_faster_whisper, turbo_mode=turbo_mode)
                 detected_lang = result.get("language", "unknown")
                 
-                # Adjust subtitle timing
-                result["segments"] = adjust_subtitle_timing(result["segments"])
+                # AI Timing Adjustment (DeepSeek)
+                if use_deepseek:
+                    # Load API key specifically for timing (even if translation is off, we might want AI timing)
+                    # But the function argument is 'use_deepseek', which usually implies translation.
+                    # However, if user passes --deepseek, we should use it for timing too.
+                    from dotenv import load_dotenv
+                    load_dotenv()
+                    deepseek_key = os.getenv('DEEPSEEK_API_KEY')
+                    
+                    if deepseek_key:
+                        structure_analysis = analyze_sentence_structure(result["segments"], deepseek_key)
+                        result["segments"] = adjust_subtitle_timing(result["segments"], structure_analysis)
+                    else:
+                        result["segments"] = adjust_subtitle_timing(result["segments"])
+                else:
+                    # Standard adjustment without AI
+                    result["segments"] = adjust_subtitle_timing(result["segments"])
+                
                 result["segments"] = optimize_subtitle_gaps(result["segments"])
                 
                 # Save checkpoint
@@ -434,6 +451,9 @@ def parse_arguments():
         elif arg in ["-budget", "--budget"]:
             preset_mode = "budget"
             i += 1
+        elif arg in ["-instant", "--instant"]:
+            preset_mode = "instant"
+            i += 1
         elif arg in ["-url", "--url"] and i + 1 < len(sys.argv):
             video_source = "youtube"
             video_input = sys.argv[i + 1]
@@ -457,7 +477,7 @@ def ask_turbo_mode():
     
     console.print("\n[bold cyan]Choose Transcription Mode:[/bold cyan]")
     
-    console.print("\n[bold yellow]1. Standard Mode (Default - Accurate)[/bold yellow]")
+    console.print("\n[bold green]1. Standard Mode (Default - Accurate)[/bold green]")
     console.print("   [green]Pros:[/green]")
     console.print("   [dim]✓ Maximum accuracy (beam search)[/dim]")
     console.print("   [dim]✓ Best for noisy/challenging audio[/dim]")
@@ -465,7 +485,7 @@ def ask_turbo_mode():
     console.print("   [red]Cons:[/red]")
     console.print("   [dim]✗ Slower processing time[/dim]")
     
-    console.print("\n[bold green]2. Turbo Mode (Recommended for Clear Audio)[/bold green]")
+    console.print("\n[bold yellow]2. Turbo Mode (Recommended for Clear Audio)[/bold yellow]")
     console.print("   [green]Pros:[/green]")
     console.print("   [dim]✓ 3-6x faster transcription[/dim]")
     console.print("   [dim]✓ Greedy search (instant decisions)[/dim]")
@@ -475,14 +495,14 @@ def ask_turbo_mode():
     console.print("   [dim]✗ Slightly less accurate for very noisy audio[/dim]")
     
     while True:
-        console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1 or 2):[/white] ", end="")
+        console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1 or 2, default=1):[/white] ", end="")
         choice = input().strip()
-        if choice == "1":
+        if choice == "" or choice == "1":
             return False
         elif choice == "2":
             return True
         else:
-            console.print("[yellow]Please enter 1 or 2[/yellow]")
+            console.print("[yellow]Please enter 1 or 2 (or press Enter for default)[/yellow]")
 
 
 def ask_deepseek():
@@ -531,7 +551,7 @@ def ask_embedding_method():
     while True:
         console.print("\n[bold cyan]Choose Embedding Method:[/bold cyan]")
         
-        console.print("\n[bold cyan]1. Soft Subtitle - INSTANT ⚡[/bold cyan]")
+        console.print("\n[bold green]1. Soft Subtitle - INSTANT ⚡ (Default - Recommended)[/bold green]")
         console.print("   [green]Pros:[/green]")
         console.print("   [dim]✓ INSTANT (1-5 seconds only!)[/dim]")
         console.print("   [dim]✓ No quality loss (stream copy)[/dim]")
@@ -541,58 +561,42 @@ def ask_embedding_method():
         console.print("   [dim]✗ Need to enable in player (VLC: press V)[/dim]")
         console.print("   [dim]✗ Not visible on Instagram/TikTok[/dim]")
         
-        console.print("\n[bold yellow]2. Hardsub - Standard Quality[/bold yellow]")
-        console.print("   [green]Pros:[/green]")
-        console.print("   [dim]✓ Best quality[/dim]")
-        console.print("   [dim]✓ Works on all platforms (Instagram, TikTok)[/dim]")
-        console.print("   [dim]✓ Subtitle permanently burned in[/dim]")
-        console.print("   [red]Cons:[/red]")
-        console.print("   [dim]✗ Slowest (~12-13 min for 17 min video)[/dim]")
-        
-        console.print("\n[bold green]3. Hardsub - Fast Encoding (Default - Recommended)[/bold green]")
+        console.print("\n[bold yellow]2. Hardsub - Fast Encoding[/bold yellow]")
         console.print("   [green]Pros:[/green]")
         console.print("   [dim]✓ 3-4x faster (~3-5 min for 17 min video)[/dim]")
-        console.print("   [dim]✓ Works on all platforms[/dim]")
+        console.print("   [dim]✓ Works on all platforms (Instagram, TikTok)[/dim]")
         console.print("   [dim]✓ Good quality[/dim]")
         console.print("   [dim]✓ Always visible (no need to enable)[/dim]")
         console.print("   [red]Cons:[/red]")
-        console.print("   [dim]✗ Slightly lower quality than standard[/dim]")
+        console.print("   [dim]✗ Requires re-encoding (takes time)[/dim]")
         
-        # Show GPU option with availability status
+        # Show GPU option only if available
         if gpu_available:
-            console.print("\n[bold magenta]4. Hardsub - GPU Accelerated ✓ Available[/bold magenta]")
+            console.print("\n[bold magenta]3. Hardsub - GPU Accelerated ✓[/bold magenta]")
+            console.print("   [green]Pros:[/green]")
+            console.print("   [dim]✓ Fastest hardsub (~2-3 min for 17 min video)[/dim]")
+            console.print("   [dim]✓ Works on all platforms[/dim]")
+            console.print("   [dim]✓ Good quality[/dim]")
+            console.print("   [red]Cons:[/red]")
+            console.print("   [dim]✗ Requires NVIDIA GPU[/dim]")
+            
+            console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1, 2, or 3, default=1):[/white] ", end="")
         else:
-            console.print("\n[bold magenta]4. Hardsub - GPU Accelerated ✗ Not Available[/bold magenta]")
+            console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1 or 2, default=1):[/white] ", end="")
         
-        console.print("   [green]Pros:[/green]")
-        console.print("   [dim]✓ Fastest hardsub (~2-3 min for 17 min video)[/dim]")
-        console.print("   [dim]✓ Works on all platforms[/dim]")
-        console.print("   [dim]✓ Good quality[/dim]")
-        console.print("   [red]Cons:[/red]")
-        console.print("   [dim]✗ Requires NVIDIA GPU[/dim]")
-        
-        console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1, 2, 3, or 4, default=3):[/white] ", end="")
         choice = input().strip()
         
-        if choice == "1":
+        if choice == "" or choice == "1":
             return 'soft'
         elif choice == "2":
-            return 'standard'
-        elif choice == "" or choice == "3":
             return 'fast'
-        elif choice == "4":
-            # Validate GPU availability
-            if not gpu_available:
-                console.print("\n[bold red]❌ NVIDIA GPU not detected![/bold red]")
-                console.print("[yellow]GPU Accelerated encoding requires NVIDIA GPU with CUDA support.[/yellow]")
-                console.print("[yellow]Please choose option 1, 2, or 3.[/yellow]")
-                console.print("\n[dim]Press Enter to continue...[/dim]")
-                input()
-                # Loop back to show menu again
-                continue
+        elif choice == "3" and gpu_available:
             return 'gpu'
         else:
-            console.print("[yellow]Please enter 1, 2, 3, or 4 (or press Enter for default)[/yellow]")
+            if gpu_available:
+                console.print("[yellow]Please enter 1, 2, or 3 (or press Enter for default)[/yellow]")
+            else:
+                console.print("[yellow]Please enter 1 or 2 (or press Enter for default)[/yellow]")
 
 
 def ask_video_source():
@@ -663,6 +667,113 @@ def main():
         pass  # Ignore cleanup errors
     
     model, lang, deepseek_flag, faster_flag, turbo_flag, video_source, video_input, preset_mode, no_resume = parse_arguments()
+    
+    # Check for existing checkpoints FIRST (before asking anything)
+    if not no_resume:
+        from utils.checkpoint import list_checkpoints
+        from utils.ui import console
+        
+        checkpoints = list_checkpoints()
+        
+        if checkpoints:
+            # Show available checkpoints
+            console.print("\n[bold yellow]📋 Found Previous Checkpoint(s)[/bold yellow]")
+            console.print("[dim]You have unfinished video processing:[/dim]\n")
+            
+            for i, cp in enumerate(checkpoints, 1):
+                video_name = cp['video_name']
+                step = cp['step']
+                timestamp_str = cp['timestamp']
+                
+                # Format timestamp to readable format
+                try:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(timestamp_str)
+                    timestamp_display = dt.strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    timestamp_display = timestamp_str
+                
+                # Format step name
+                step_display = {
+                    'transcription': '🎤 Transcription',
+                    'translation': '🌍 Translation',
+                    'embedding': '🎬 Embedding'
+                }.get(step, step)
+                
+                console.print(f"[cyan]{i}.[/cyan] [bold]{video_name}[/bold]")
+                console.print(f"   [dim]Last completed:[/dim] {step_display}")
+                console.print(f"   [dim]Time:[/dim] {timestamp_display}\n")
+            
+            # Ask user if they want to resume
+            console.print("[bold yellow]?[/bold yellow] [white]Resume from checkpoint?[/white]")
+            console.print("  [cyan]1.[/cyan] Yes, continue from where I left off")
+            console.print("  [cyan]2.[/cyan] No, start fresh (ignore checkpoint)")
+            
+            while True:
+                console.print("\n[bold yellow]?[/bold yellow] [white]Choose option (1 or 2):[/white] ", end="")
+                choice = input().strip()
+                if choice in ["1", "2"]:
+                    resume_choice = int(choice)
+                    break
+                else:
+                    from utils.ui import print_warning
+                    print_warning("Please enter 1 or 2")
+            
+            if resume_choice == 1:
+                # User wants to resume - use the first checkpoint
+                checkpoint_data = checkpoints[0]
+                video_file = checkpoint_data['video_path']
+                video_title = checkpoint_data.get('video_name')
+                
+                console.print(f"\n[green]✓[/green] Resuming: [bold]{video_title}[/bold]")
+                console.print(f"[dim]Will skip completed steps and continue...[/dim]\n")
+                
+                # Get output directory
+                output_dir = get_output_directory()
+                
+                # Skip to processing with resume enabled
+                # Set flags from checkpoint if available
+                translate_flag = True
+                embed_flag = True
+                
+                # Get Whisper mode from environment
+                whisper_mode = os.getenv('WHISPER_MODE', '1')
+                faster_flag = True if whisper_mode == '1' else False
+                
+                # Get turbo mode from environment if not set
+                if turbo_flag is None:
+                    turbo_env = os.getenv('TURBO_MODE', 'ask').lower()
+                    if turbo_env == 'true':
+                        turbo_flag = True
+                    elif turbo_env == 'false':
+                        turbo_flag = False
+                
+                # Get DeepSeek flag from environment if not set
+                if deepseek_flag is None:
+                    deepseek_api_key = os.getenv('DEEPSEEK_API_KEY', '')
+                    deepseek_flag = bool(deepseek_api_key)
+                
+                # Use default embedding method
+                embedding_method = 'soft'
+                
+                # Jump directly to processing
+                return process_video(
+                    video_file=video_file,
+                    model=model,
+                    lang=lang,
+                    translate_flag=translate_flag,
+                    embed_flag=embed_flag,
+                    deepseek_flag=deepseek_flag,
+                    faster_flag=faster_flag,
+                    turbo_flag=turbo_flag,
+                    embedding_method=embedding_method,
+                    video_title=video_title,
+                    output_dir=output_dir,
+                    resume=True
+                )
+            else:
+                # User wants to start fresh
+                console.print("\n[yellow]⚠[/yellow] Starting fresh, checkpoint will be overwritten\n")
     
     # If video source not provided via command line, ask user
     if video_source is None:
@@ -755,26 +866,59 @@ def main():
                 deepseek_flag = False
             embedding_method = 'fast'
             print_info("Preset", "Budget (Standard + Google + Fast Hardsub)")
+        
+        elif preset_mode == "instant":
+            # Instant: Standard + DeepSeek + Soft Subtitle (Instant, no re-encoding)
+            if turbo_flag is None:
+                turbo_flag = False
+            if deepseek_flag is None:
+                deepseek_flag = True
+            embedding_method = 'soft'
+            print_info("Preset", "Instant (Standard + DeepSeek + Soft Subtitle)")
     
     else:
         # Interactive mode - ask user for each option
-        # Get Turbo mode from environment variable if not set via command line
+        
+        # Get Transcription mode from environment variable if not set via command line
         if turbo_flag is None:
             turbo_env = os.getenv('TURBO_MODE', 'ask')
             if turbo_env.lower() == 'true':
                 turbo_flag = True
+                print_info("Transcription Mode", "Turbo (from .env)")
             elif turbo_env.lower() == 'false':
                 turbo_flag = False
+                print_info("Transcription Mode", "Standard (from .env)")
             else:
                 # Ask user
                 turbo_flag = ask_turbo_mode()
         
-        # Ask about DeepSeek if not set via command line
+        # Get Translation method from environment variable if not set via command line
         if deepseek_flag is None:
-            deepseek_flag = ask_deepseek()
+            deepseek_env = os.getenv('TRANSLATION_METHOD', 'ask')
+            if deepseek_env.lower() == 'deepseek':
+                deepseek_flag = True
+                print_info("Translation Method", "DeepSeek AI (from .env)")
+            elif deepseek_env.lower() == 'google':
+                deepseek_flag = False
+                print_info("Translation Method", "Google Translate (from .env)")
+            else:
+                # Ask user
+                deepseek_flag = ask_deepseek()
         
-        # Ask about embedding method
-        embedding_method = ask_embedding_method()
+        # Get Embedding method from environment variable
+        embedding_env = os.getenv('EMBEDDING_METHOD', 'ask')
+        if embedding_env.lower() in ['soft', 'fast', 'gpu', 'standard']:
+            embedding_method = embedding_env.lower()
+            embedding_names = {
+                'soft': 'Soft Subtitle (Instant)',
+                'fast': 'Hardsub - Fast Encoding',
+                'gpu': 'Hardsub - GPU Accelerated',
+                'standard': 'Hardsub - Standard Quality'
+            }
+            print_info("Embedding Method", f"{embedding_names.get(embedding_method, embedding_method)} (from .env)")
+        else:
+            # Ask user
+            embedding_method = ask_embedding_method()
     
     print_header("AUTO SUBTITLE GENERATOR")
     print_info("Video", video_file)
@@ -786,7 +930,6 @@ def main():
     if turbo_flag and faster_flag:
         transcriber_name += " [TURBO]"
     print_info("Transcriber", transcriber_name)
-    
     print_info("Translator", "DeepSeek AI" if deepseek_flag else "Google Translate")
     
 
@@ -802,6 +945,31 @@ def main():
     
     print_info("Output", "Video with subtitle")
     
+    return process_video(
+        video_file=video_file,
+        model=model,
+        lang=lang,
+        translate_flag=translate_flag,
+        embed_flag=embed_flag,
+        deepseek_flag=deepseek_flag,
+        faster_flag=faster_flag,
+        turbo_flag=turbo_flag,
+        embedding_method=embedding_method,
+        video_title=video_title if video_source == "youtube" else None,
+        output_dir=output_dir,
+        resume=not no_resume,
+        video_source=video_source
+    )
+
+
+def process_video(video_file, model, lang, translate_flag, embed_flag, deepseek_flag, 
+                  faster_flag, turbo_flag, embedding_method, video_title, output_dir, 
+                  resume=True, video_source=None):
+    """
+    Process video with subtitle generation
+    
+    Extracted as separate function to allow resume from checkpoint
+    """
     try:
         output_video = generate_subtitle(
             video_file, 
@@ -813,9 +981,9 @@ def main():
             use_faster_whisper=faster_flag,
             turbo_mode=turbo_flag,
             embedding_method=embedding_method,
-            video_title=video_title if video_source == "youtube" else None,
+            video_title=video_title,
             output_dir=output_dir,
-            resume=not no_resume  # Enable resume by default, disable if --no-resume flag
+            resume=resume
         )
         
         # Clean up original YouTube video after successful generation
@@ -829,6 +997,8 @@ def main():
             except Exception as e:
                 from utils.ui import print_warning
                 print_warning(f"Failed to delete original video: {str(e)}")
+        
+        return output_video
         
     except KeyboardInterrupt:
         from utils.ui import print_warning

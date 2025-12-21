@@ -16,7 +16,7 @@ def get_video_duration(video_path):
             '-show_format',
             video_path
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, encoding='utf-8', errors='replace')
         data = json.loads(result.stdout)
         return float(data['format']['duration'])
     except:
@@ -31,7 +31,8 @@ def check_gpu_available():
         result = subprocess.run(
             ['nvidia-smi'],
             capture_output=True,
-            text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=5
         )
         
@@ -42,7 +43,8 @@ def check_gpu_available():
         result2 = subprocess.run(
             ['ffmpeg', '-hwaccels'],
             capture_output=True,
-            text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=5
         )
         
@@ -188,8 +190,8 @@ def embed_subtitle_to_video(video_path, subtitle_path, output_path=None, method=
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
-            universal_newlines=True
+            encoding='utf-8',
+            errors='replace'  # Replace undecodable bytes with ?
         )
         
         # Create progress bar if we know duration (skip for soft subtitle - too fast)
@@ -238,7 +240,7 @@ def embed_subtitle_to_video(video_path, subtitle_path, output_path=None, method=
                     '-select_streams', 's',
                     output_path
                 ]
-                verify_result = subprocess.run(verify_cmd, capture_output=True, text=True)
+                verify_result = subprocess.run(verify_cmd, capture_output=True, encoding='utf-8', errors='replace')
                 
                 if verify_result.returncode == 0:
                     import json

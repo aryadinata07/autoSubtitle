@@ -20,26 +20,29 @@ def is_sentence_ending(text):
     return text[-1] in ['.', '?', '!', '"', '"', ')', ']', '…']
 
 
-def adjust_subtitle_timing(segments):
+def adjust_subtitle_timing(segments, structure_analysis=None):
     """
     Smart timing adjustment dengan Linguistic Bridging.
     
     Filosofi:
-    - Gunakan kecerdasan DeepSeek untuk deteksi kalimat gantung
-    - Jika kalimat belum selesai (tidak ada titik), TAHAN subtitle
-    - Ini mengatasi "dramatic pause" yang tidak bisa diselesaikan timing saja
+    - Gunakan kecerdasan DeepSeek untuk deteksi kalimat gantung (structure_analysis)
+    - Jika kalimat belum selesai (CONTINUES), TAHAN subtitle
     
     Args:
         segments: List of subtitle segments with start, end, text
+        structure_analysis: Optional list of 'COMPLETE'/'CONTINUES' statuses
     
     Returns:
         Adjusted segments
     """
     load_dotenv()
     
-    min_duration = float(os.getenv('SUBTITLE_MIN_DURATION', '1.0'))
-    max_duration = float(os.getenv('SUBTITLE_MAX_DURATION', '7.0'))
-    gap_settings = float(os.getenv('SUBTITLE_GAP', '0.05'))
+    min_duration = float(os.getenv('SUBTITLE_MIN_DURATION', '1.5'))
+    max_duration = float(os.getenv('SUBTITLE_MAX_DURATION', '8.0'))
+    gap_settings = float(os.getenv('SUBTITLE_GAP', '0.1'))
+    
+    # NEW: Minimum reading time based on text length (characters per second)
+    min_reading_speed = 15
     
     adjusted_segments = []
     
@@ -48,31 +51,40 @@ def adjust_subtitle_timing(segments):
         end = segment['end']
         text = segment['text']
         
+        # Calculate minimum duration
+        text_length = len(text)
+        min_reading_duration = text_length / min_reading_speed
+        effective_min_duration = max(min_duration, min_reading_duration)
+        
         # LOGIC: Cek subtitle berikutnya
         if i < len(segments) - 1:
             next_start = segments[i + 1]['start']
             silence_gap = next_start - end
             
-            # Cek apakah kalimat ini 'Gantung' (Belum ada titik/tanda baca akhir)
-            # Ini kekuatan DeepSeek: Dia tau struktur kalimat
-            sentence_incomplete = not is_sentence_ending(text)
+            # CEK KONDISI GANTUNG (LINGUISTIC BRIDGE)
+            sentence_incomplete = False
             
-            # KONDISI 1: Kalimat Gantung (Linguistic Bridge)
-            # Walaupun orangnya diam 3 detik, kalau kalimat belum titik, TAHAN text-nya
-            if sentence_incomplete and silence_gap < 3.0:
-                # Extend sampai subtitle berikutnya mulai
+            # Prioritas 1: AI Analysis (DeepSeek)
+            if structure_analysis and i < len(structure_analysis):
+                status = structure_analysis[i]
+                if status == 'CONTINUES':
+                    sentence_incomplete = True
+            
+            # Prioritas 2: Heuristic Fallback (jika AI tidak ada)
+            else:
+                sentence_incomplete = not is_sentence_ending(text)
+            
+            # KONDISI 1: Kalimat Gantung
+            # Jika AI bilang 'CONTINUES', kita bridge gap-nya walaupun agak jauh (max 4 detik)
+            if sentence_incomplete and silence_gap < 4.0:
                 potential_end = next_start - gap_settings
-                
-                # Batasi dengan max duration biar gak aneh kalau heningnya kelamaan
                 if (potential_end - start) <= max_duration:
                     end = potential_end
                 else:
                     end = start + max_duration
             
             # KONDISI 2: Jeda Pendek Biasa (Napas)
-            # Kalimat mungkin udah selesai, tapi jedanya pendek banget (< 1 detik)
-            # Sambung aja biar mata gak capek kedip
-            elif silence_gap < 1.0:
+            elif silence_gap < 1.5:
                 potential_end = next_start - gap_settings
                 if (potential_end - start) <= max_duration:
                     end = potential_end
@@ -80,15 +92,23 @@ def adjust_subtitle_timing(segments):
             # KONDISI 3: Overlap
             elif silence_gap <= 0:
                 end = next_start - gap_settings
+            
+            # KONDISI 4: Ensure minimum reading time
+            if (end - start) < effective_min_duration:
+                potential_end = start + effective_min_duration
+                if potential_end < next_start - gap_settings:
+                    end = potential_end
+                else:
+                    end = next_start - gap_settings
         
         else:
             # Subtitle Terakhir
-            if (end - start) < min_duration:
-                end = start + min_duration
+            if (end - start) < effective_min_duration:
+                end = start + effective_min_duration
         
         # Final Safety Check
         if end <= start:
-            end = start + min_duration
+            end = start + effective_min_duration
         
         adjusted_segments.append({
             'start': round(start, 3),
