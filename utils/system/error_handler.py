@@ -1,5 +1,5 @@
 """Enhanced error handling with helpful messages"""
-from .ui import print_error, print_substep, print_warning
+from utils.system.ui import print_error, print_substep, print_warning
 
 
 class SubtitleError(Exception):

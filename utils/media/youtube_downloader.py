@@ -2,7 +2,7 @@
 import os
 from yt_dlp import YoutubeDL
 from tqdm import tqdm
-from .ui import print_step, print_substep, print_success, print_error
+from utils.system.ui import print_step, print_substep, print_success, print_error
 
 
 class DownloadProgressBar:

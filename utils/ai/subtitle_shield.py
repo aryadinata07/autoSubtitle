@@ -8,12 +8,12 @@ V2.1 Features:
 - Statistics Report: Detailed transparency report
 """
 from openai import OpenAI
-from .ui import print_step, print_substep, print_success, print_warning, console
+from utils.system.ui import print_step, print_substep, print_success, print_warning, print_info, console
 import time
 import pysrt
 
 
-def subtitle_shield_review(subs, source_lang, target_lang, api_key, video_title=None, original_subs=None):
+def subtitle_shield_review(subs, source_lang, target_lang, api_key, video_title=None, original_subs=None, ai_context=None):
     """
     SubtitleShield V2.1: Side-by-side comparison for contextual repair
     
@@ -34,6 +34,7 @@ def subtitle_shield_review(subs, source_lang, target_lang, api_key, video_title=
         api_key: DeepSeek API key
         video_title: Video title for context
         original_subs: Original subtitle entries (before translation) for comparison
+        ai_context: Optional detected context dict (Topic, Tone, Keywords)
     
     Returns:
         tuple: (cleaned_subs, report)
@@ -70,6 +71,14 @@ def subtitle_shield_review(subs, source_lang, target_lang, api_key, video_title=
     context += f"Translation: {source_lang.upper()} → {target_lang.upper()}\n"
     context += f"Original language: {source_lang.upper()}\n"
     context += f"Target language: {target_lang.upper()}\n"
+    
+    # Inject AI Context if available
+    if ai_context:
+        context += f"\n[AI DETECTED CONTEXT]\n"
+        context += f"TOPIC: {ai_context.get('topic', 'Unknown')}\n"
+        context += f"TONE: {ai_context.get('tone', 'Unknown')}\n"
+        context += f"KEYWORDS: {ai_context.get('keywords', 'None')}\n"
+        print_info("Shield Context", f"Loaded Topic: {ai_context.get('topic')}")
 
     # Call AI for deep review with batch processing
     try:

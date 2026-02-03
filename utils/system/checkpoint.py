@@ -22,7 +22,7 @@ class CheckpointManager:
         # Checkpoint directory
         if checkpoint_dir is None:
             # Use script directory for checkpoints
-            script_dir = Path(__file__).parent.parent
+            script_dir = Path(__file__).parents[2]
             checkpoint_dir = script_dir / '.checkpoints'
         
         self.checkpoint_dir = Path(checkpoint_dir)
@@ -90,7 +90,7 @@ def cleanup_old_checkpoints(max_age_days=7):
     """
     import time
     
-    script_dir = Path(__file__).parent.parent
+    script_dir = Path(__file__).parents[2]
     checkpoint_dir = script_dir / '.checkpoints'
     
     if not checkpoint_dir.exists():
@@ -112,7 +112,7 @@ def list_checkpoints():
     Returns:
         list: List of checkpoint data dicts, sorted by timestamp (newest first)
     """
-    script_dir = Path(__file__).parent.parent
+    script_dir = Path(__file__).parents[2]
     checkpoint_dir = script_dir / '.checkpoints'
     
     if not checkpoint_dir.exists():

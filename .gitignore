@@ -46,3 +46,7 @@ temp_live/
 # OS
 .DS_Store
 Thumbs.db
+
+# Project
+autosub.log
+output/
