@@ -227,6 +227,71 @@ def ask_embedding_method():
                 console.print("[yellow]Please enter 1 or 2 (or press Enter for default)[/yellow]")
 
 
+def ask_target_language(source_lang=None):
+    """Ask user for target translation language (Excluding detected source)."""
+    console.print("\n[bold cyan]Choose Target Language:[/bold cyan]")
+    if source_lang:
+        console.print(f"   [dim]Detected Source: {source_lang.upper()}[/dim]")
+    
+    # Pre-defined major languages
+    all_options = [
+        {'code': 'id', 'name': 'Indonesian'},
+        {'code': 'en', 'name': 'English'},
+        {'code': 'ja', 'name': 'Japanese'},
+        {'code': 'ko', 'name': 'Korean'},
+        {'code': 'es', 'name': 'Spanish'},
+        {'code': 'fr', 'name': 'French'},
+        {'code': 'de', 'name': 'German'},
+    ]
+    
+    # Filter out source language to avoid redundancy
+    # Normalize source_lang (handle 'english' vs 'en' if needed, but usually 2 chars)
+    normalized_source = source_lang.lower()[:2] if source_lang else ""
+    
+    available_options = []
+    for opt in all_options:
+        # Skip if matches source
+        if opt['code'] == normalized_source:
+            continue
+        available_options.append(opt)
+    
+    # Display Options
+    for i, opt in enumerate(available_options, 1):
+        is_default = (i == 1)
+        suffix = " (Default)" if is_default else ""
+        color = "green" if is_default else "yellow"
+        console.print(f"   [bold {color}]{i}. {opt['name']}{suffix}[/bold {color}]")
+        
+    # Custom Option is always last
+    custom_idx = len(available_options) + 1
+    console.print(f"   [bold yellow]{custom_idx}. Enter Custom Code[/bold yellow]")
+    
+    while True:
+        console.print(f"\n[bold yellow]?[/bold yellow] [white]Choose option (1-{custom_idx}, default=1):[/white] ", end="")
+        choice = input().strip()
+        
+        # Default Logic
+        if not choice:
+            return available_options[0]['code']
+            
+        if not choice.isdigit():
+            console.print("[yellow]Please enter a valid number.[/yellow]")
+            continue
+            
+        idx = int(choice)
+        
+        if 1 <= idx <= len(available_options):
+            return available_options[idx-1]['code']
+        elif idx == custom_idx:
+            while True:
+                console.print("   [bold yellow]?[/bold yellow] [white]Enter 2-letter code (e.g. ru, zh, it):[/white] ", end="")
+                code = input().strip().lower()
+                if len(code) == 2: return code
+                console.print("[yellow]Invalid format. Use 2 letters.[/yellow]")
+        else:
+            console.print(f"[yellow]Invalid option. Please enter 1-{custom_idx}.[/yellow]")
+
+
 def ask_video_source():
     """Ask user for video source with Smart Resume"""
     from utils.system.checkpoint import list_checkpoints

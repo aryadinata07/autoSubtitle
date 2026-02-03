@@ -16,9 +16,9 @@ from core.cli import parse_arguments
 from core.runner import process_video_runner, get_output_directory
 from utils.system.config_wizard import run_wizard
 from utils.system.ui import (
-    console, print_header, print_info, print_error, print_warning, 
+    console, print_header, print_info, print_error, print_warning, print_substep, 
     ask_turbo_mode, ask_deepseek, ask_embedding_method, ask_video_source,
-    get_youtube_url, get_local_file
+    get_youtube_url, get_local_file, ask_target_language
 )
 from core.config import load_config
 from core.logger import log
@@ -127,6 +127,9 @@ def main():
                 embedding_method = embed_config
             else:
                 embedding_method = ask_embedding_method()
+                
+        # Target Language Logic (Just load config, no ask yet)
+        target_lang = config.get('TARGET_LANGUAGE', 'ask')
 
     # Display Header Info
     output_dir = args.output_dir if args.output_dir else get_output_directory()
@@ -134,6 +137,7 @@ def main():
     print_header("AUTO SUBTITLE GENERATOR")
     print_info("Model", model)
     print_info("Language", lang if lang else "auto-detect")
+    print_info("Target Lang", args.target_lang if hasattr(args, 'target_lang') and args.target_lang else (target_lang if 'target_lang' in locals() else 'auto'))
     print_info("Transcriber", f"Faster-Whisper {'[TURBO]' if turbo_flag and faster_flag else ''}")
     print_info("Translator", "DeepSeek AI" if deepseek_flag else "Google Translate")
     print_info("Embedding", embedding_method)
@@ -204,8 +208,10 @@ def main():
         video_title=video_title,
         output_dir=output_dir,
         resume=not no_resume,
-        video_source=video_source
+        video_source=video_source,
+        target_lang=target_lang if 'target_lang' in locals() else None
     )
+
 
 if __name__ == "__main__":
     try:

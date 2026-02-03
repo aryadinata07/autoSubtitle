@@ -16,6 +16,15 @@ from utils.system.ui import (
 # Constants
 SCRIPT_DIR = Path(__file__).parent.parent
 
+def get_processing_directory():
+    """Get or create hidden processing directory"""
+    proc_dir = SCRIPT_DIR / ".processing"
+    proc_dir.mkdir(exist_ok=True)
+    # Force hide on Windows
+    if os.name == 'nt':
+        os.system(f'attrib +h "{proc_dir}"')
+    return proc_dir
+
 def get_output_directory():
     """Get or create output directory"""
     output_dir = SCRIPT_DIR / "output"
@@ -36,7 +45,7 @@ def determine_translation_direction(detected_lang):
 
 def process_video_runner(video_file, model, lang, translate_flag, embed_flag, deepseek_flag, 
                   faster_flag, turbo_flag, embedding_method, video_title, output_dir, 
-                  resume=True, video_source=None):
+                  resume=True, video_source=None, target_lang=None):
     """
     Process video with subtitle generation (Public Interface)
     """
@@ -95,7 +104,8 @@ def process_video_runner(video_file, model, lang, translate_flag, embed_flag, de
                 print_substep("Resuming from checkpoint...")
 
         # --- Step 1: Audio Extraction --- 
-        audio_path = str(SCRIPT_DIR / "temp_audio.wav")
+        processing_dir = get_processing_directory()
+        audio_path = str(processing_dir / "temp_audio.wav")
         audio_path = extract_audio(video_file, audio_path)
 
         if not os.path.exists(audio_path):
@@ -194,8 +204,6 @@ def process_video_runner(video_file, model, lang, translate_flag, embed_flag, de
 
         # --- Step 3: Translation ---
         translated_subs = None
-        target_lang = "id" if detected_lang != "id" else "en"
-        
         if translate_flag:
             # Create temporary subtitle in memory
             temp_subs = pysrt.SubRipFile()
@@ -250,46 +258,58 @@ def process_video_runner(video_file, model, lang, translate_flag, embed_flag, de
                     translated_subs = None
 
             if not translated_subs:
-                # Perfor Translation
-                source_lang, target_lang = determine_translation_direction(detected_lang)
+                # Perform Translation
+                if not target_lang or target_lang == 'ask':
+                    # Interactive Ask (Just-in-Time)
+                    from utils.system.ui import ask_target_language
+                    target_lang = ask_target_language(detected_lang)
+                    source_lang = detected_lang
+                else:
+                    # Respect explicit target language
+                    source_lang = detected_lang
+                    
                 deepseek_key = None
                 if deepseek_flag:
                     from core.config import load_config
                     config = load_config()
                     deepseek_key = config.get('DEEPSEEK_API_KEY')
                 
-                try:
-                    translated_subs = translate_subtitles(
-                        temp_subs, 
-                        source_lang, 
-                        target_lang,
-                        use_deepseek=deepseek_flag,
-                        deepseek_api_key=deepseek_key,
-                        video_title=video_title
-                    )
+                if source_lang == target_lang:
+                    print_info("Translation", f"Skipping translation ({source_lang} -> {target_lang})")
+                    translated_subs = temp_subs
+                else: 
+                    try:
+                        translated_subs = translate_subtitles(
+                            temp_subs, 
+                            source_lang, 
+                            target_lang,
+                            use_deepseek=deepseek_flag,
+                            deepseek_api_key=deepseek_key,
+                            video_title=video_title
+                        )
                     
                     # Save checkpoint
-                    if checkpoint:
-                        # Serialize
-                        subs_data = []
-                        for sub in translated_subs:
-                            subs_data.append({
-                                'index': sub.index,
-                                'start': {'hours': sub.start.hours, 'minutes': sub.start.minutes, 
-                                          'seconds': sub.start.seconds, 'milliseconds': sub.start.milliseconds},
-                                'end': {'hours': sub.end.hours, 'minutes': sub.end.minutes,
-                                        'seconds': sub.end.seconds, 'milliseconds': sub.end.milliseconds},
-                                'text': sub.text
+                        if checkpoint:
+                            # Serialize
+                            subs_data = []
+                            for sub in translated_subs:
+                                subs_data.append({
+                                    'index': sub.index,
+                                    'start': {'hours': sub.start.hours, 'minutes': sub.start.minutes, 
+                                              'seconds': sub.start.seconds, 'milliseconds': sub.start.milliseconds},
+                                    'end': {'hours': sub.end.hours, 'minutes': sub.end.minutes,
+                                            'seconds': sub.end.seconds, 'milliseconds': sub.end.milliseconds},
+                                    'text': sub.text
+                                })
+                            checkpoint.save('translation', {
+                                'transcription': result,
+                                'detected_lang': detected_lang,
+                                'translated_subs': subs_data,
+                                'source_lang': source_lang,
+                                'target_lang': target_lang
                             })
-                        checkpoint.save('translation', {
-                            'transcription': result,
-                            'detected_lang': detected_lang,
-                            'translated_subs': subs_data,
-                            'source_lang': source_lang,
-                            'target_lang': target_lang
-                        })
-                except Exception as e:
-                    handle_translation_error(e)
+                    except Exception as e:
+                        handle_translation_error(e)
             
             # Apply Styling
             style = get_subtitle_styling(video_file)
@@ -303,7 +323,7 @@ def process_video_runner(video_file, model, lang, translate_flag, embed_flag, de
                 sub.text = f"{styling}{text}"
             
             # Save Temp SRT
-            temp_srt = str(SCRIPT_DIR / f"temp_subtitle_{target_lang}.srt")
+            temp_srt = str(processing_dir / f"temp_subtitle_{target_lang}.srt")
             if os.path.exists(temp_srt):
                 os.remove(temp_srt)
             translated_subs.save(temp_srt, encoding="utf-8")
@@ -365,19 +385,32 @@ def process_video_runner(video_file, model, lang, translate_flag, embed_flag, de
         
     finally:
         # Cleanup audio
-        # Note: Original code kept audio if not handled, here we replicate 'finally' cleanup
-        # We assume keep_audio is False by default for now or add it as arg if needed.
-        # But for 'don't repeat yourself', we extract cleanup logic potentially.
-        if os.path.exists(audio_path):
+        if 'audio_path' in locals() and os.path.exists(audio_path):
             try:
                 os.remove(audio_path)
                 print_substep("Cleaned up temporary audio file")
             except:
                 pass
         
+        # Cleanup enhanced audio if exists
+        if 'audio_path' in locals():
+            enhanced_path = str(Path(audio_path).parent / "temp_audio_enhanced.wav")
+            if os.path.exists(enhanced_path):
+                try: os.remove(enhanced_path); print_substep("Cleaned up enhanced audio file")
+                except: pass
+
         # Helper method for temp audio cleaning
-        temp_files = [SCRIPT_DIR / 'temp-audio.m4a', SCRIPT_DIR / 'temp-audio.m4a.temp']
-        for tf in temp_files:
-             if tf.exists():
-                 try: tf.unlink()
-                 except: pass
+        processing_dir = SCRIPT_DIR / ".processing"
+        if processing_dir.exists():
+            import shutil
+            try:
+                # Remove all files in processing dir
+                for item in processing_dir.iterdir():
+                    if item.is_file():
+                        item.unlink()
+                # Optionally remove the dir itself if really empty
+                # processing_dir.rmdir() 
+                print_substep("Cleaned up processing directory")
+            except Exception as e:
+                # print_warning(f"Cleanup warning: {e}")
+                pass

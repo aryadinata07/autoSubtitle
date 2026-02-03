@@ -172,6 +172,49 @@ def menu_subtitle_style():
     else:
         console.print("[yellow]Invalid choice.[/yellow]")
 
+def menu_target_language():
+    """Menu for Default Target Language"""
+    console.print("\n[bold cyan]🌐 Target Language Configuration[/bold cyan]")
+    
+    current = load_config().get('TARGET_LANGUAGE', 'ask')
+    if current == 'ask': current_display = "Ask every time (Interactive)"
+    else: current_display = current.upper()
+    
+    console.print(f"Current Setting: [green]{current_display}[/green]")
+    
+    console.print("\n[bold white]Options:[/bold white]")
+    console.print("[1] Ask for each video (Default)")
+    console.print("[2] Indonesian (id)")
+    console.print("[3] English (en)")
+    console.print("[4] Japanese (ja)")
+    console.print("[5] Korean (ko)")
+    console.print("[6] Spanish (es)")
+    console.print("[7] French (fr)")
+    console.print("[8] German (de)")
+    console.print("[9] Custom Code (e.g. ru, zh, it)")
+    
+    choice = input("\nChoice: ").strip()
+    
+    if choice == '1':
+        save_config('TARGET_LANGUAGE', 'ask')
+        print_success("Mode set to: Ask every time")
+    elif choice == '2': save_config('TARGET_LANGUAGE', 'id'); print_success("Target set to: Indonesian")
+    elif choice == '3': save_config('TARGET_LANGUAGE', 'en'); print_success("Target set to: English")
+    elif choice == '4': save_config('TARGET_LANGUAGE', 'ja'); print_success("Target set to: Japanese")
+    elif choice == '5': save_config('TARGET_LANGUAGE', 'ko'); print_success("Target set to: Korean")
+    elif choice == '6': save_config('TARGET_LANGUAGE', 'es'); print_success("Target set to: Spanish")
+    elif choice == '7': save_config('TARGET_LANGUAGE', 'fr'); print_success("Target set to: French")
+    elif choice == '8': save_config('TARGET_LANGUAGE', 'de'); print_success("Target set to: German")
+    elif choice == '9':
+        code = input("Enter 2-letter language code (e.g. ru): ").strip().lower()
+        if len(code) == 2:
+            save_config('TARGET_LANGUAGE', code)
+            print_success(f"Target set to: {code}")
+        else:
+            console.print("[red]Invalid code format.[/red]")
+    else:
+        console.print("[yellow]Invalid choice.[/yellow]")
+
 def menu_translation_method():
     """Menu for Translation Method (Provider)"""
     console.print("\n[bold cyan]🌐 Translation Service Provider[/bold cyan]")
@@ -268,6 +311,9 @@ def run_wizard():
         provider = config.get('TRANSLATION_METHOD', 'DeepSeek' if config.get('DEEPSEEK_API_KEY') else 'Google')
         console.print(f"7. Provider         : [cyan]{provider.upper()}[/cyan]")
         
+        target_lang = config.get('TARGET_LANGUAGE', 'ask')
+        console.print(f"8. Target Language  : [cyan]{target_lang.upper() if target_lang != 'ask' else 'Interactive'}[/cyan]")
+        
         console.print("\n[bold white]Actions:[/bold white]")
         console.print("[1] Configure API Key")
         console.print("[2] Configure Model")
@@ -276,7 +322,8 @@ def run_wizard():
         console.print("[5] Configure Subtitle Style")
         console.print("[6] Configure Quality (Economy/Premium)")
         console.print("[7] Configure Translation Provider (Google/DeepSeek)")
-        console.print("[8] Exit")
+        console.print("[8] Configure Default Target Language")
+        console.print("[9] Exit")
         
         choice = input("\nSelect option: ").strip()
         
@@ -295,6 +342,8 @@ def run_wizard():
         elif choice == '7':
             menu_translation_method()
         elif choice == '8':
+            menu_target_language()
+        elif choice == '9':
             console.print("\n[green]Configuration saved. Exiting wizard.[/green]")
             break
         else:
