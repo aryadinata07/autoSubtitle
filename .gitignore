@@ -25,7 +25,16 @@ wheels/
 
 # Environment
 .env
-.venv
+
+# Checkpoints
+.checkpoints/
+
+# Temporary files
+temp_live/
+*.mp4
+*.ts
+*.wav
+*.srt
 
 # IDE
 .vscode/
@@ -38,15 +47,6 @@ wheels/
 .DS_Store
 Thumbs.db
 
-# Project specific
-downloads/*.mp4
-downloads/*.mkv
-downloads/*.avi
-downloads/*.webm
-*.mp4
-*.mkv
-*.avi
-*.webm
-temp_audio.wav
-temp-audio.m4a
-*_temp.srt
+# Project
+autosub.log
+output/

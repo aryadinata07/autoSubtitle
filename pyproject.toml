@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autoSubtitle"
+version = "2.1.0"
+description = "AI-Powered Auto Subtitle Generator with DeepSeek & Whisper"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Arya Dinata", email = "arya@example.com"}
+]
+keywords = ["subtitle", "ai", "whisper", "deepseek", "automation"]
+dependencies = [
+    "openai-whisper",
+    "faster-whisper",
+    "openai>=1.0.0",
+    "deep-translator",
+    "yt-dlp",
+    "pysrt",
+    "tqdm",
+    "moviepy",
+    "colorama",
+    "rich",
+    "python-dotenv",
+    "torch",
+]
+
+[project.urls]
+Homepage = "https://github.com/aryadinata07/autoSubtitle"
+Repository = "https://github.com/aryadinata07/autoSubtitle"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "black",
+    "flake8",
+    "mypy"
+]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"

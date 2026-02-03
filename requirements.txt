@@ -8,4 +8,6 @@ colorama
 rich
 openai
 python-dotenv
+
+# YouTube downloader
 yt-dlp
